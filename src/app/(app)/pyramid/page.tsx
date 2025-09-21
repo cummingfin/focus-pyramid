@@ -363,26 +363,6 @@ export default function PyramidPage() {
                     <p className="text-gray-500 text-lg font-medium">{slide.subtitle}</p>
                   </div>
 
-                  {/* Parent Goals Breadcrumb */}
-                  {slide.parentGoals && slide.parentGoals.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-medium text-gray-600 mb-3">{slide.parentTitle}</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {slide.parentGoals.slice(0, 5).map((goal: any) => (
-                          <div 
-                            key={goal.id}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium ${
-                              goal.done 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-gray-100 text-gray-700'
-                            }`}
-                          >
-                            {goal.title}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Progress Bar */}
                   <div className="mb-8">
@@ -523,6 +503,41 @@ export default function PyramidPage() {
                                       <span>Link to {slide.parentTitle.toLowerCase()}</span>
                                     </button>
                                   )}
+
+                                  {/* Inline Parent Goals Selector */}
+                                  {showLinkModal?.slide === slideIndex && showLinkModal?.slot === slot && (
+                                    <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-medium text-gray-600">Choose parent goal:</span>
+                                        <button
+                                          onClick={() => setShowLinkModal(null)}
+                                          className="text-gray-400 hover:text-gray-600"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {slide.parentGoals?.map((parentGoal: any) => (
+                                          <button
+                                            key={parentGoal.id}
+                                            onClick={() => linkToParent(slideIndex, slot, parentGoal.id)}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                              parentGoal.done 
+                                                ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                          >
+                                            {parentGoal.title}
+                                          </button>
+                                        ))}
+                                        {(!slide.parentGoals || slide.parentGoals.length === 0) && (
+                                          <span className="text-xs text-gray-500 italic">
+                                            No parent goals set yet
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -580,6 +595,54 @@ export default function PyramidPage() {
                                   </button>
                                 </>
                               )}
+
+                              {/* Parent Goal Link for new goals */}
+                              {slideIndex < 4 && !goal && (
+                                <div className="ml-10 mt-2">
+                                  <button
+                                    onClick={() => setShowLinkModal({ slide: slideIndex, slot })}
+                                    className="text-xs text-blue-500 hover:text-blue-600 flex items-center space-x-1"
+                                  >
+                                    <LinkIcon size={10} />
+                                    <span>Link to {slide.parentTitle.toLowerCase()}</span>
+                                  </button>
+
+                                  {/* Inline Parent Goals Selector for new goals */}
+                                  {showLinkModal?.slide === slideIndex && showLinkModal?.slot === slot && (
+                                    <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-xs font-medium text-gray-600">Choose parent goal:</span>
+                                        <button
+                                          onClick={() => setShowLinkModal(null)}
+                                          className="text-gray-400 hover:text-gray-600"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {slide.parentGoals?.map((parentGoal: any) => (
+                                          <button
+                                            key={parentGoal.id}
+                                            onClick={() => linkToParent(slideIndex, slot, parentGoal.id)}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                              parentGoal.done 
+                                                ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                          >
+                                            {parentGoal.title}
+                                          </button>
+                                        ))}
+                                        {(!slide.parentGoals || slide.parentGoals.length === 0) && (
+                                          <span className="text-xs text-gray-500 italic">
+                                            No parent goals set yet
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -605,44 +668,6 @@ export default function PyramidPage() {
         </div>
       </div>
 
-      {/* Link to Parent Goal Modal */}
-      {showLinkModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Link to Parent Goal</h3>
-            <p className="text-gray-600 mb-4">Choose which parent goal this supports:</p>
-            
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {slides[showLinkModal.slide].parentGoals?.map((goal: any) => (
-                <button
-                  key={goal.id}
-                  onClick={() => linkToParent(showLinkModal.slide, showLinkModal.slot, goal.id)}
-                  className="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                >
-                  <div className="font-medium text-gray-900">{goal.title}</div>
-                  <div className="text-sm text-gray-500">{goal.area}</div>
-                </button>
-              ))}
-            </div>
-
-            {(!slides[showLinkModal.slide].parentGoals || slides[showLinkModal.slide].parentGoals.length === 0) && (
-              <div className="text-center py-8 text-gray-500">
-                <p className="mb-4">No parent goals set yet</p>
-                <p className="text-sm">Create parent goals first to link your goals</p>
-              </div>
-            )}
-
-            <div className="mt-6 flex space-x-3">
-              <button
-                onClick={() => setShowLinkModal(null)}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-xl hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
