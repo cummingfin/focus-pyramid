@@ -31,77 +31,129 @@ export default function HistoryPage() {
 
   const loadHistory = () => {
     const today = todayUTC();
-    const weekStart = getWeekStart(today);
     const historyData: WeekHistory[] = [];
     
-    // Generate last 4 weeks of data
-    for (let weekOffset = 3; weekOffset >= 0; weekOffset--) {
-      const weekDate = new Date(weekStart);
-      weekDate.setDate(weekDate.getDate() - (weekOffset * 7));
-      const weekKey = formatDate(weekDate, 'yyyy-MM-dd');
+    // Get all historical daily data from localStorage
+    const allDailyData: Record<string, any[]> = {};
+    
+    // Load daily outcomes for the last 30 days to find actual usage
+    for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+      const dayDate = new Date(today);
+      dayDate.setDate(dayDate.getDate() - dayOffset);
+      const dayKey = formatDate(dayDate, 'yyyy-MM-dd');
       
-      const weekHistory: WeekHistory = {
-        weekStart: formatDate(weekDate, 'MMM dd'),
-        weeklyWins: 0,
-        weeklyTotal: 0,
-        hasWin: false,
-        days: []
-      };
-
-      // Generate 7 days for this week
-      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-        const dayDate = new Date(weekDate);
-        dayDate.setDate(dayDate.getDate() + dayOffset);
-        const dayKey = formatDate(dayDate, 'yyyy-MM-dd');
-        
-        // Load goals for this day
-        const dailyGoals = JSON.parse(localStorage.getItem('daily-outcomes') || '[]');
-        const priorityGoals = dailyGoals.filter((g: any) => g.slot <= 3);
-        const completedGoals = priorityGoals.filter((g: any) => g.done);
-        const hasWin = completedGoals.length >= Math.ceil(priorityGoals.length * 0.67);
-        
-        weekHistory.days.push({
-          date: formatDate(dayDate, 'MMM dd'),
-          dailyWins: completedGoals.length,
-          dailyTotal: priorityGoals.length,
-          hasWin,
-          completedGoals: completedGoals.map((g: any) => g.title)
-        });
-
-        if (hasWin) weekHistory.weeklyWins++;
-        weekHistory.weeklyTotal++;
+      // Check if there's any data for this specific day
+      const dailyGoalsForDay = JSON.parse(localStorage.getItem(`daily-outcomes-${dayKey}`) || '[]');
+      if (dailyGoalsForDay.length > 0) {
+        allDailyData[dayKey] = dailyGoalsForDay;
       }
-
-      weekHistory.hasWin = weekHistory.weeklyWins >= Math.ceil(weekHistory.weeklyTotal * 0.67);
-      historyData.push(weekHistory);
     }
-
+    
+    // Also check the current daily goals (today's data)
+    const currentDailyGoals = JSON.parse(localStorage.getItem('daily-outcomes') || '[]');
+    if (currentDailyGoals.length > 0) {
+      const todayKey = formatDate(today, 'yyyy-MM-dd');
+      allDailyData[todayKey] = currentDailyGoals;
+    }
+    
+    // Get unique dates where user had goals
+    const usedDates = Object.keys(allDailyData).sort();
+    
+    if (usedDates.length === 0) {
+      setHistory([]);
+      setCurrentStreak(0);
+      setBestStreak(0);
+      return;
+    }
+    
+    // Group days by week
+    const weeksMap: Record<string, DayHistory[]> = {};
+    
+    usedDates.forEach(dateKey => {
+      const date = new Date(dateKey);
+      const weekStart = getWeekStart(date);
+      const weekKey = formatDate(weekStart, 'yyyy-MM-dd');
+      
+      if (!weeksMap[weekKey]) {
+        weeksMap[weekKey] = [];
+      }
+      
+      const dailyGoals = allDailyData[dateKey] || [];
+      const priorityGoals = dailyGoals.filter((g: any) => g.slot <= 3);
+      const completedGoals = priorityGoals.filter((g: any) => g.done);
+      const hasWin = priorityGoals.length > 0 && completedGoals.length >= Math.ceil(priorityGoals.length * 0.67);
+      
+      weeksMap[weekKey].push({
+        date: formatDate(date, 'MMM dd'),
+        dailyWins: completedGoals.length,
+        dailyTotal: priorityGoals.length,
+        hasWin,
+        completedGoals: completedGoals.map((g: any) => g.title)
+      });
+    });
+    
+    // Convert to WeekHistory format and sort by date
+    Object.entries(weeksMap).forEach(([weekKey, days]) => {
+      const weekDate = new Date(weekKey);
+      const weeklyWins = days.filter(day => day.hasWin).length;
+      const weeklyTotal = days.length;
+      const hasWin = weeklyWins >= Math.ceil(weeklyTotal * 0.67);
+      
+      // Sort days within the week by date
+      days.sort((a, b) => {
+        const dateA = new Date(dateKey);
+        const dateB = new Date(dateKey);
+        // Simple sort by date string (MMM dd format)
+        return a.date.localeCompare(b.date);
+      });
+      
+      historyData.push({
+        weekStart: formatDate(weekDate, 'MMM dd'),
+        weeklyWins,
+        weeklyTotal,
+        hasWin,
+        days
+      });
+    });
+    
+    // Sort weeks by date (newest first)
+    historyData.sort((a, b) => {
+      const dateA = new Date(a.weekStart);
+      const dateB = new Date(b.weekStart);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
     setHistory(historyData);
     
-    // Calculate streaks
+    // Calculate streaks from actual data
     let streak = 0;
     let bestStreakCount = 0;
+    let tempStreak = 0;
     
-    // Count current streak from today backwards
-    for (let i = historyData.length - 1; i >= 0; i--) {
-      const week = historyData[i];
-      for (let j = week.days.length - 1; j >= 0; j--) {
-        const day = week.days[j];
-        const dayDate = new Date();
-        dayDate.setDate(dayDate.getDate() - (historyData.length - 1 - i) * 7 - (week.days.length - 1 - j));
-        
-        if (dayDate <= today) {
-          if (day.hasWin) {
-            streak++;
-            bestStreakCount = Math.max(bestStreakCount, streak);
-          } else {
-            bestStreakCount = Math.max(bestStreakCount, streak);
-            if (dayDate < today) streak = 0; // Only reset if it's not today
-          }
-        }
+    // Go through all days in reverse chronological order
+    const allDays: DayHistory[] = [];
+    historyData.forEach(week => {
+      week.days.forEach(day => allDays.push(day));
+    });
+    
+    // Sort all days by date (newest first)
+    allDays.sort((a, b) => {
+      const dateA = new Date(formatDate(today, 'yyyy') + '-' + a.date);
+      const dateB = new Date(formatDate(today, 'yyyy') + '-' + b.date);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    allDays.forEach((day, index) => {
+      if (day.hasWin) {
+        tempStreak++;
+        if (index === 0) streak = tempStreak; // Current streak is the first sequence
+      } else {
+        bestStreakCount = Math.max(bestStreakCount, tempStreak);
+        tempStreak = 0;
       }
-    }
+    });
     
+    bestStreakCount = Math.max(bestStreakCount, tempStreak);
     setCurrentStreak(streak);
     setBestStreak(bestStreakCount);
   };
@@ -171,7 +223,19 @@ export default function HistoryPage() {
 
       {/* Weekly History */}
       <div className="space-y-6">
-        {history.map((week, weekIndex) => (
+        {history.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-200">
+            <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No History Yet</h3>
+            <p className="text-gray-600 mb-4">
+              Start adding and completing daily goals to build your history and streaks.
+            </p>
+            <p className="text-sm text-gray-500">
+              Your progress will appear here once you've been using the app for a few days.
+            </p>
+          </div>
+        ) : (
+          history.map((week, weekIndex) => (
           <div key={weekIndex} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -244,7 +308,8 @@ export default function HistoryPage() {
               </div>
             )}
           </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Motivation Section */}

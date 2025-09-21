@@ -203,7 +203,11 @@ export default function PyramidPage() {
 
   // Save to localStorage whenever goals change
   useEffect(() => {
+    // Save daily goals with today's date for history tracking
+    const todayKey = formatDate(todayUTC(), 'yyyy-MM-dd');
     localStorage.setItem('daily-outcomes', JSON.stringify(allGoals.daily));
+    localStorage.setItem(`daily-outcomes-${todayKey}`, JSON.stringify(allGoals.daily));
+    
     localStorage.setItem(`weekly-goals-${weekKey}`, JSON.stringify(allGoals.weekly));
     localStorage.setItem('monthly-goals', JSON.stringify(allGoals.monthly));
     localStorage.setItem('yearly-goals', JSON.stringify(allGoals.yearly));
