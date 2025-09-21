@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { formatDate, todayUTC, getWeekStart, getMonthName, getYear } from '@/lib/dates';
-import { Check, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, Plus, X, ChevronLeft, ChevronRight, Link as LinkIcon, Trophy } from 'lucide-react';
 
 export default function PyramidPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -18,6 +18,7 @@ export default function PyramidPage() {
   const [editingSlot, setEditingSlot] = useState<{slide: number, slot: number} | null>(null);
   const [editText, setEditText] = useState('');
   const [maxSlots, setMaxSlots] = useState({ daily: 3, weekly: 3, monthly: 3, yearly: 3, fiveYear: 3 });
+  const [showLinkModal, setShowLinkModal] = useState<{slide: number, slot: number} | null>(null);
   
   // Touch/swipe handling
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -90,6 +91,20 @@ export default function PyramidPage() {
     return Math.round((completed / goals.length) * 100);
   };
 
+  const getPriorityProgress = (goals: any[]) => {
+    const priorityGoals = goals.filter(g => g.slot <= 3);
+    if (priorityGoals.length === 0) return 0;
+    const completed = priorityGoals.filter(g => g.done).length;
+    return Math.round((completed / priorityGoals.length) * 100);
+  };
+
+  const getWinStatus = (goals: any[]) => {
+    const priorityGoals = goals.filter(g => g.slot <= 3);
+    if (priorityGoals.length === 0) return false;
+    const completed = priorityGoals.filter(g => g.done).length;
+    return completed >= Math.ceil(priorityGoals.length * 0.67); // 2/3 or more
+  };
+
   const handleAddGoal = (slideIndex: number, slot: number) => {
     if (!editText.trim()) return;
 
@@ -102,6 +117,7 @@ export default function PyramidPage() {
       title: editText.trim(),
       done: false,
       area: slideKey === 'daily' ? null : 'work',
+      linkedToParent: null,
       created_at: new Date().toISOString()
     };
 
@@ -143,10 +159,36 @@ export default function PyramidPage() {
     }));
   };
 
+  const linkToParent = (slideIndex: number, slot: number, parentGoalId: string) => {
+    const slideKeys = ['daily', 'weekly', 'monthly', 'yearly', 'fiveYear'];
+    const slideKey = slideKeys[slideIndex];
+
+    setAllGoals(prev => ({
+      ...prev,
+      [slideKey]: prev[slideKey].map((g: any) => 
+        g.slot === slot ? { ...g, linkedToParent: parentGoalId } : g
+      )
+    }));
+
+    setShowLinkModal(null);
+  };
+
   const getGoalForSlot = (slideIndex: number, slot: number) => {
     const slideKeys = ['daily', 'weekly', 'monthly', 'yearly', 'fiveYear'];
     const slideKey = slideKeys[slideIndex];
     return allGoals[slideKey as keyof typeof allGoals].find((g: any) => g.slot === slot);
+  };
+
+  const getParentGoal = (slideIndex: number, parentGoalId: string) => {
+    const parentSlideKeys = ['weekly', 'monthly', 'yearly', 'fiveYear'];
+    const parentSlideKey = parentSlideKeys[slideIndex];
+    return allGoals[parentSlideKey as keyof typeof allGoals]?.find((g: any) => g.id === parentGoalId);
+  };
+
+  const getParentGoals = (slideIndex: number) => {
+    const parentSlideKeys = ['weekly', 'monthly', 'yearly', 'fiveYear'];
+    const parentSlideKey = parentSlideKeys[slideIndex];
+    return allGoals[parentSlideKey as keyof typeof allGoals] || [];
   };
 
   const addMoreSlots = (slideIndex: number) => {
@@ -185,7 +227,9 @@ export default function PyramidPage() {
       progressColor: 'bg-red-500',
       goals: allGoals.daily,
       maxSlots: maxSlots.daily,
-      key: 'daily'
+      key: 'daily',
+      parentGoals: getParentGoals(0), // Weekly goals
+      parentTitle: "This Week's Goals"
     },
     {
       title: "This Week",
@@ -195,7 +239,9 @@ export default function PyramidPage() {
       progressColor: 'bg-orange-500',
       goals: allGoals.weekly,
       maxSlots: maxSlots.weekly,
-      key: 'weekly'
+      key: 'weekly',
+      parentGoals: getParentGoals(1), // Monthly goals
+      parentTitle: "This Month's Goals"
     },
     {
       title: "This Month",
@@ -205,7 +251,9 @@ export default function PyramidPage() {
       progressColor: 'bg-green-500',
       goals: allGoals.monthly,
       maxSlots: maxSlots.monthly,
-      key: 'monthly'
+      key: 'monthly',
+      parentGoals: getParentGoals(2), // Yearly goals
+      parentTitle: "This Year's Goals"
     },
     {
       title: "This Year",
@@ -215,7 +263,9 @@ export default function PyramidPage() {
       progressColor: 'bg-blue-500',
       goals: allGoals.yearly,
       maxSlots: maxSlots.yearly,
-      key: 'yearly'
+      key: 'yearly',
+      parentGoals: getParentGoals(3), // 5-Year goals
+      parentTitle: "5-Year Vision"
     },
     {
       title: "5-Year Vision",
@@ -225,7 +275,9 @@ export default function PyramidPage() {
       progressColor: 'bg-purple-500',
       goals: allGoals.fiveYear,
       maxSlots: maxSlots.fiveYear,
-      key: 'fiveYear'
+      key: 'fiveYear',
+      parentGoals: [],
+      parentTitle: ""
     }
   ];
 
@@ -289,28 +341,59 @@ export default function PyramidPage() {
         >
           {slides.map((slide, slideIndex) => {
             const progress = getProgressForHorizon(slide.goals);
+            const priorityProgress = getPriorityProgress(slide.goals);
+            const hasWin = getWinStatus(slide.goals);
             
             return (
               <div key={slide.key} className="w-full flex-shrink-0 px-6 py-8">
                 <div className={`${slide.bgColor} rounded-3xl shadow-sm border border-gray-200/50 p-8 h-full flex flex-col`}>
                   {/* Header */}
-                  <div className="text-center mb-8">
-                    <h2 className={`text-3xl font-semibold ${slide.accentColor} mb-2 tracking-tight`}>
-                      {slide.title}
-                    </h2>
+                  <div className="text-center mb-6">
+                    <div className="flex items-center justify-center space-x-2 mb-2">
+                      <h2 className={`text-3xl font-semibold ${slide.accentColor} tracking-tight`}>
+                        {slide.title}
+                      </h2>
+                      {hasWin && (
+                        <div className="flex items-center space-x-1 bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                          <Trophy size={14} />
+                          <span className="text-xs font-medium">WIN</span>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-gray-500 text-lg font-medium">{slide.subtitle}</p>
                   </div>
+
+                  {/* Parent Goals Breadcrumb */}
+                  {slide.parentGoals && slide.parentGoals.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-medium text-gray-600 mb-3">{slide.parentTitle}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {slide.parentGoals.slice(0, 5).map((goal: any) => (
+                          <div 
+                            key={goal.id}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+                              goal.done 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {goal.title}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Progress Bar */}
                   <div className="mb-8">
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-gray-600 font-medium text-sm">Progress</span>
-                      <span className={`${slide.accentColor} text-2xl font-semibold`}>{progress}%</span>
+                      <span className="text-gray-600 font-medium text-sm">Priority Progress</span>
+                      <span className={`${slide.accentColor} text-2xl font-semibold`}>{priorityProgress}%</span>
                     </div>
                     <div className="bg-gray-200 rounded-full h-2">
                       <div 
                         className={`${slide.progressColor} rounded-full h-2 transition-all duration-500 ease-out`}
-                        style={{ width: `${progress}%` }}
+                        style={{ width: `${priorityProgress}%` }}
                       />
                     </div>
                   </div>
@@ -322,6 +405,7 @@ export default function PyramidPage() {
                       const isEditing = editingSlot?.slide === slideIndex && editingSlot?.slot === slot;
                       const isPriority = slot <= 3;
                       const isOptional = slot > 3;
+                      const parentGoal = goal?.linkedToParent ? getParentGoal(slideIndex, goal.linkedToParent) : null;
                       
                       return (
                         <div 
@@ -348,68 +432,98 @@ export default function PyramidPage() {
                           )}
 
                           {goal ? (
-                            <div className="flex items-center space-x-4">
-                              <button
-                                onClick={() => toggleGoal(slideIndex, goal.id)}
-                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                                  goal.done
-                                    ? `${slide.progressColor} border-transparent`
-                                    : isPriority 
-                                      ? 'border-gray-400 hover:border-gray-500' 
-                                      : 'border-gray-300 hover:border-gray-400'
-                                }`}
-                              >
-                                {goal.done && <Check size={14} className="text-white" />}
-                              </button>
-                              {isEditing ? (
-                                <div className="flex-1 flex items-center space-x-2">
-                                  <input
-                                    type="text"
-                                    value={editText}
-                                    onChange={(e) => setEditText(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleEditGoal(slideIndex, slot, editText);
-                                      } else if (e.key === 'Escape') {
+                            <div className="space-y-3">
+                              <div className="flex items-center space-x-4">
+                                <button
+                                  onClick={() => toggleGoal(slideIndex, goal.id)}
+                                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                                    goal.done
+                                      ? `${slide.progressColor} border-transparent`
+                                      : isPriority 
+                                        ? 'border-gray-400 hover:border-gray-500' 
+                                        : 'border-gray-300 hover:border-gray-400'
+                                  }`}
+                                >
+                                  {goal.done && <Check size={14} className="text-white" />}
+                                </button>
+                                {isEditing ? (
+                                  <div className="flex-1 flex items-center space-x-2">
+                                    <input
+                                      type="text"
+                                      value={editText}
+                                      onChange={(e) => setEditText(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleEditGoal(slideIndex, slot, editText);
+                                        } else if (e.key === 'Escape') {
+                                          setEditingSlot(null);
+                                          setEditText('');
+                                        }
+                                      }}
+                                      className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-gray-900 placeholder-gray-400"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleEditGoal(slideIndex, slot, editText)}
+                                      className="text-green-500 hover:text-green-600 transition-colors"
+                                    >
+                                      <Check size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => {
                                         setEditingSlot(null);
                                         setEditText('');
-                                      }
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-gray-900 placeholder-gray-400"
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => handleEditGoal(slideIndex, slot, editText)}
-                                    className="text-green-500 hover:text-green-600 transition-colors"
-                                  >
-                                    <Check size={16} />
-                                  </button>
-                                  <button
+                                      }}
+                                      className="text-red-500 hover:text-red-600 transition-colors"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span 
+                                    className={`flex-1 cursor-pointer transition-colors ${
+                                      goal.done 
+                                        ? 'line-through text-gray-400' 
+                                        : isPriority 
+                                          ? 'text-gray-900' 
+                                          : 'text-gray-600'
+                                    }`}
                                     onClick={() => {
-                                      setEditingSlot(null);
-                                      setEditText('');
+                                      setEditText(goal.title);
+                                      setEditingSlot({ slide: slideIndex, slot });
                                     }}
-                                    className="text-red-500 hover:text-red-600 transition-colors"
                                   >
-                                    <X size={16} />
-                                  </button>
+                                    {goal.title}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Parent Goal Link */}
+                              {slideIndex < 4 && (
+                                <div className="ml-10">
+                                  {parentGoal ? (
+                                    <div className="flex items-center space-x-2">
+                                      <LinkIcon size={12} className="text-blue-500" />
+                                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                                        🔗 {parentGoal.title}
+                                      </span>
+                                      <button
+                                        onClick={() => setShowLinkModal({ slide: slideIndex, slot })}
+                                        className="text-xs text-gray-400 hover:text-gray-600"
+                                      >
+                                        Change
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setShowLinkModal({ slide: slideIndex, slot })}
+                                      className="text-xs text-blue-500 hover:text-blue-600 flex items-center space-x-1"
+                                    >
+                                      <LinkIcon size={10} />
+                                      <span>Link to {slide.parentTitle.toLowerCase()}</span>
+                                    </button>
+                                  )}
                                 </div>
-                              ) : (
-                                <span 
-                                  className={`flex-1 cursor-pointer transition-colors ${
-                                    goal.done 
-                                      ? 'line-through text-gray-400' 
-                                      : isPriority 
-                                        ? 'text-gray-900' 
-                                        : 'text-gray-600'
-                                  }`}
-                                  onClick={() => {
-                                    setEditText(goal.title);
-                                    setEditingSlot({ slide: slideIndex, slot });
-                                  }}
-                                >
-                                  {goal.title}
-                                </span>
                               )}
                             </div>
                           ) : (
@@ -490,6 +604,45 @@ export default function PyramidPage() {
           })}
         </div>
       </div>
+
+      {/* Link to Parent Goal Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Link to Parent Goal</h3>
+            <p className="text-gray-600 mb-4">Choose which parent goal this supports:</p>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {slides[showLinkModal.slide].parentGoals?.map((goal: any) => (
+                <button
+                  key={goal.id}
+                  onClick={() => linkToParent(showLinkModal.slide, showLinkModal.slot, goal.id)}
+                  className="w-full text-left p-3 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                >
+                  <div className="font-medium text-gray-900">{goal.title}</div>
+                  <div className="text-sm text-gray-500">{goal.area}</div>
+                </button>
+              ))}
+            </div>
+
+            {(!slides[showLinkModal.slide].parentGoals || slides[showLinkModal.slide].parentGoals.length === 0) && (
+              <div className="text-center py-8 text-gray-500">
+                <p className="mb-4">No parent goals set yet</p>
+                <p className="text-sm">Create parent goals first to link your goals</p>
+              </div>
+            )}
+
+            <div className="mt-6 flex space-x-3">
+              <button
+                onClick={() => setShowLinkModal(null)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-xl hover:bg-gray-400 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
