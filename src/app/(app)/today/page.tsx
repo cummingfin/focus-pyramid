@@ -1,16 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { formatDate, todayUTC } from '@/lib/dates';
-import { Check, Plus, X } from 'lucide-react';
+import { formatDate, todayUTC, getWeekStart } from '@/lib/dates';
+import { Check, Plus, X, Link as LinkIcon } from 'lucide-react';
 
 export default function TodayPage() {
   const [outcomes, setOutcomes] = useState<any[]>([]);
+  const [weeklyGoals, setWeeklyGoals] = useState<any[]>([]);
   const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [editText, setEditText] = useState('');
   const [maxSlots, setMaxSlots] = useState(3);
+  const [showLinkModal, setShowLinkModal] = useState<number | null>(null);
 
-  // Load outcomes from localStorage on component mount
+  const weekKey = formatDate(getWeekStart(), 'yyyy-MM-dd');
+
+  // Load outcomes and weekly goals from localStorage
   useEffect(() => {
     const savedOutcomes = localStorage.getItem('daily-outcomes');
     if (savedOutcomes) {
@@ -20,7 +24,11 @@ export default function TodayPage() {
     if (savedMaxSlots) {
       setMaxSlots(parseInt(savedMaxSlots));
     }
-  }, []);
+    const savedWeeklyGoals = localStorage.getItem(`weekly-goals-${weekKey}`);
+    if (savedWeeklyGoals) {
+      setWeeklyGoals(JSON.parse(savedWeeklyGoals));
+    }
+  }, [weekKey]);
 
   // Save outcomes to localStorage whenever they change
   useEffect(() => {
@@ -36,6 +44,7 @@ export default function TodayPage() {
       slot,
       title: editText.trim(),
       done: false,
+      linkedToWeeklyGoal: null,
       created_at: new Date().toISOString()
     };
 
@@ -68,8 +77,21 @@ export default function TodayPage() {
     );
   };
 
+  const linkToWeeklyGoal = (outcomeSlot: number, weeklyGoalId: string) => {
+    setOutcomes(prev => 
+      prev.map(o => 
+        o.slot === outcomeSlot ? { ...o, linkedToWeeklyGoal: weeklyGoalId } : o
+      )
+    );
+    setShowLinkModal(null);
+  };
+
   const getOutcomeForSlot = (slot: 1 | 2 | 3 | 4 | 5) => {
     return outcomes.find(o => o.slot === slot);
+  };
+
+  const getLinkedWeeklyGoal = (weeklyGoalId: string) => {
+    return weeklyGoals.find(g => g.id === weeklyGoalId);
   };
 
   const addMoreSlots = () => {
@@ -85,12 +107,16 @@ export default function TodayPage() {
         <p className="text-gray-600">
           {formatDate(todayUTC(), 'EEEE, MMMM do, yyyy')}
         </p>
+        <p className="text-sm text-blue-600 mt-1">
+          💡 Link your daily outcomes to weekly goals for better focus
+        </p>
       </div>
 
       <div className="space-y-4">
         {Array.from({ length: maxSlots }, (_, i) => i + 1).map((slot) => {
           const outcome = getOutcomeForSlot(slot as 1 | 2 | 3 | 4 | 5);
           const isEditing = editingSlot === slot;
+          const linkedGoal = outcome?.linkedToWeeklyGoal ? getLinkedWeeklyGoal(outcome.linkedToWeeklyGoal) : null;
           
           return (
             <div key={slot} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -141,15 +167,36 @@ export default function TodayPage() {
                         </button>
                       </div>
                     ) : (
-                      <span 
-                        className={`flex-1 ${outcome.done ? 'line-through text-gray-500' : 'text-gray-900'} cursor-pointer`}
-                        onClick={() => {
-                          setEditText(outcome.title);
-                          setEditingSlot(slot as 1 | 2 | 3 | 4 | 5);
-                        }}
-                      >
-                        {outcome.title}
-                      </span>
+                      <div className="flex-1">
+                        <span 
+                          className={`${outcome.done ? 'line-through text-gray-500' : 'text-gray-900'} cursor-pointer`}
+                          onClick={() => {
+                            setEditText(outcome.title);
+                            setEditingSlot(slot as 1 | 2 | 3 | 4 | 5);
+                          }}
+                        >
+                          {outcome.title}
+                        </span>
+                        
+                        {linkedGoal ? (
+                          <div className="flex items-center space-x-2 mt-2">
+                            <LinkIcon size={12} className="text-blue-500" />
+                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                              → {linkedGoal.title}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setShowLinkModal(slot)}
+                              className="text-xs text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+                            >
+                              <LinkIcon size={10} />
+                              <span>Link to weekly goal</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -219,6 +266,45 @@ export default function TodayPage() {
           </div>
         )}
       </div>
+
+      {/* Link to Weekly Goal Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Link to Weekly Goal</h3>
+            <p className="text-gray-600 mb-4">Choose which weekly goal this daily outcome supports:</p>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {weeklyGoals.map((goal) => (
+                <button
+                  key={goal.id}
+                  onClick={() => linkToWeeklyGoal(showLinkModal, goal.id)}
+                  className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                >
+                  <div className="font-medium text-gray-900">{goal.title}</div>
+                  <div className="text-sm text-gray-500">{goal.area}</div>
+                </button>
+              ))}
+            </div>
+
+            {weeklyGoals.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <p className="mb-4">No weekly goals set yet</p>
+                <p className="text-sm">Create weekly goals first to link your daily outcomes</p>
+              </div>
+            )}
+
+            <div className="mt-6 flex space-x-3">
+              <button
+                onClick={() => setShowLinkModal(null)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

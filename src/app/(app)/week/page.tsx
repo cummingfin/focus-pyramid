@@ -1,15 +1,17 @@
 'use client';
 
 import { formatDate, getWeekStart, getWeekDays, isCurrentWeek } from '@/lib/dates';
-import { Target, Plus, Check, X } from 'lucide-react';
+import { Target, Plus, Check, X, Link as LinkIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function WeekPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [goals, setGoals] = useState<any[]>([]);
+  const [monthlyGoals, setMonthlyGoals] = useState<any[]>([]);
   const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [editText, setEditText] = useState('');
   const [maxSlots, setMaxSlots] = useState(3);
+  const [showLinkModal, setShowLinkModal] = useState<number | null>(null);
 
   const weekDays = getWeekDays(getWeekStart(selectedDate));
   const weekKey = formatDate(getWeekStart(selectedDate), 'yyyy-MM-dd');
@@ -25,6 +27,10 @@ export default function WeekPage() {
     const savedMaxSlots = localStorage.getItem(`weekly-max-slots-${weekKey}`);
     if (savedMaxSlots) {
       setMaxSlots(parseInt(savedMaxSlots));
+    }
+    const savedMonthlyGoals = localStorage.getItem('monthly-goals');
+    if (savedMonthlyGoals) {
+      setMonthlyGoals(JSON.parse(savedMonthlyGoals));
     }
   }, [weekKey]);
 
@@ -43,6 +49,7 @@ export default function WeekPage() {
       title: editText.trim(),
       done: false,
       area: 'work',
+      linkedToMonthlyGoal: null,
       created_at: new Date().toISOString()
     };
 
@@ -75,8 +82,21 @@ export default function WeekPage() {
     );
   };
 
+  const linkToMonthlyGoal = (weeklyGoalSlot: number, monthlyGoalId: string) => {
+    setGoals(prev => 
+      prev.map(g => 
+        g.slot === weeklyGoalSlot ? { ...g, linkedToMonthlyGoal: monthlyGoalId } : g
+      )
+    );
+    setShowLinkModal(null);
+  };
+
   const getGoalForSlot = (slot: 1 | 2 | 3 | 4 | 5) => {
     return goals.find(g => g.slot === slot);
+  };
+
+  const getLinkedMonthlyGoal = (monthlyGoalId: string) => {
+    return monthlyGoals.find(g => g.id === monthlyGoalId);
   };
 
   const addMoreSlots = () => {
@@ -89,6 +109,9 @@ export default function WeekPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Weekly Goals</h1>
         <p className="text-gray-600">
           Week of {formatDate(getWeekStart(selectedDate), 'MMM dd')} - {formatDate(weekDays[6], 'MMM dd, yyyy')}
+        </p>
+        <p className="text-sm text-blue-600 mt-1">
+          💡 Link your weekly goals to monthly goals for better alignment
         </p>
       </div>
 
@@ -149,6 +172,7 @@ export default function WeekPage() {
         {Array.from({ length: maxSlots }, (_, i) => i + 1).map((slot) => {
           const goal = getGoalForSlot(slot as 1 | 2 | 3 | 4 | 5);
           const isEditing = editingSlot === slot;
+          const linkedGoal = goal?.linkedToMonthlyGoal ? getLinkedMonthlyGoal(goal.linkedToMonthlyGoal) : null;
           
           return (
             <div key={slot} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -218,6 +242,25 @@ export default function WeekPage() {
                             {goal.area}
                           </span>
                         </div>
+                        
+                        {linkedGoal ? (
+                          <div className="flex items-center space-x-2 mt-2">
+                            <LinkIcon size={12} className="text-green-500" />
+                            <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                              → {linkedGoal.title}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setShowLinkModal(slot)}
+                              className="text-xs text-green-600 hover:text-green-700 flex items-center space-x-1"
+                            >
+                              <LinkIcon size={10} />
+                              <span>Link to monthly goal</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -288,6 +331,45 @@ export default function WeekPage() {
           </div>
         )}
       </div>
+
+      {/* Link to Monthly Goal Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Link to Monthly Goal</h3>
+            <p className="text-gray-600 mb-4">Choose which monthly goal this weekly goal supports:</p>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {monthlyGoals.map((goal) => (
+                <button
+                  key={goal.id}
+                  onClick={() => linkToMonthlyGoal(showLinkModal, goal.id)}
+                  className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors"
+                >
+                  <div className="font-medium text-gray-900">{goal.title}</div>
+                  <div className="text-sm text-gray-500">{goal.area}</div>
+                </button>
+              ))}
+            </div>
+
+            {monthlyGoals.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <p className="mb-4">No monthly goals set yet</p>
+                <p className="text-sm">Create monthly goals first to link your weekly goals</p>
+              </div>
+            )}
+
+            <div className="mt-6 flex space-x-3">
+              <button
+                onClick={() => setShowLinkModal(null)}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
