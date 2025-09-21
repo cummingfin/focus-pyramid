@@ -17,33 +17,64 @@ export default function AppLayout({
 
   useEffect(() => {
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
-      const workspaceId = await getUserWorkspace(session.user.id);
-      
-      if (!workspaceId) {
-        const workspace = await bootstrapWorkspace(session.user.id);
-        if (workspace) {
-          setCurrentWorkspace(workspace.id);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          router.push('/login');
+          return;
         }
-      } else {
-        setCurrentWorkspace(workspaceId);
-      }
 
-      setIsLoading(false);
-      setLoading(false);
+        console.log('User authenticated:', session.user.email);
+
+        // Check if user has a workspace
+        const workspaceId = await getUserWorkspace(session.user.id);
+        
+        if (!workspaceId) {
+          console.log('Creating new workspace for user');
+          const workspace = await bootstrapWorkspace(session.user.id);
+          if (workspace) {
+            setCurrentWorkspace(workspace.id);
+          }
+        } else {
+          console.log('Using existing workspace:', workspaceId);
+          setCurrentWorkspace(workspaceId);
+        }
+
+        setIsLoading(false);
+        setLoading(false);
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        router.push('/login');
+      }
     };
 
     initAuth();
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
+        if (event === 'SIGNED_IN' && session) {
+          console.log('User signed in, initializing workspace');
+          try {
+            const workspaceId = await getUserWorkspace(session.user.id);
+            
+            if (!workspaceId) {
+              const workspace = await bootstrapWorkspace(session.user.id);
+              if (workspace) {
+                setCurrentWorkspace(workspace.id);
+              }
+            } else {
+              setCurrentWorkspace(workspaceId);
+            }
+          } catch (error) {
+            console.error('Workspace initialization error:', error);
+          }
+        } else if (event === 'SIGNED_OUT' || !session) {
+          console.log('User signed out, redirecting to login');
+          setCurrentWorkspace(null);
           router.push('/login');
         }
       }

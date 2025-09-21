@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const router = useRouter();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +21,8 @@ export default function LoginPage() {
     try {
       if (isSignUp) {
         // Sign up
-        const { error } = await supabase.auth.signUp({
+        console.log('Attempting sign up for:', email);
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -28,24 +31,34 @@ export default function LoginPage() {
         });
 
         if (error) {
+          console.error('Sign up error:', error);
           setMessage(error.message);
         } else {
+          console.log('Sign up successful:', data);
           setMessage('Check your email for the confirmation link!');
         }
       } else {
         // Sign in
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('Attempting sign in for:', email);
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) {
+          console.error('Sign in error:', error);
           setMessage(error.message);
         } else {
-          // Redirect will happen automatically via auth state change
+          console.log('Sign in successful:', data);
+          setMessage('Sign in successful! Redirecting...');
+          // The redirect will happen automatically via auth state change
+          setTimeout(() => {
+            router.push('/today');
+          }, 1000);
         }
       }
     } catch (error) {
+      console.error('Auth error:', error);
       setMessage('An error occurred. Please try again.');
     }
     
@@ -107,16 +120,18 @@ export default function LoginPage() {
             className="text-blue-600 hover:text-blue-500 text-sm"
           >
             {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
-          <div className="mt-2">
-            <Link href="/reset-password" className="text-blue-600 hover:text-blue-500 text-sm">
-              Forgot your password?
-            </Link>
-          </div>          </button>
+          </button>
+        </div>
+
+        <div className="mt-2 text-center">
+          <Link href="/reset-password" className="text-blue-600 hover:text-blue-500 text-sm">
+            Forgot your password?
+          </Link>
         </div>
 
         {message && (
           <div className={`mt-4 p-3 rounded-md ${
-            message.includes('Check your email') 
+            message.includes('Check your email') || message.includes('successful')
               ? 'bg-green-50 text-green-700' 
               : 'bg-red-50 text-red-700'
           }`}>
