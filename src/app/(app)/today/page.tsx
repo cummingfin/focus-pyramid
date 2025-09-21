@@ -6,8 +6,9 @@ import { Check, Plus, X } from 'lucide-react';
 
 export default function TodayPage() {
   const [outcomes, setOutcomes] = useState<any[]>([]);
-  const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | null>(null);
+  const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [editText, setEditText] = useState('');
+  const [maxSlots, setMaxSlots] = useState(3);
 
   // Load outcomes from localStorage on component mount
   useEffect(() => {
@@ -15,14 +16,19 @@ export default function TodayPage() {
     if (savedOutcomes) {
       setOutcomes(JSON.parse(savedOutcomes));
     }
+    const savedMaxSlots = localStorage.getItem('daily-max-slots');
+    if (savedMaxSlots) {
+      setMaxSlots(parseInt(savedMaxSlots));
+    }
   }, []);
 
   // Save outcomes to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('daily-outcomes', JSON.stringify(outcomes));
-  }, [outcomes]);
+    localStorage.setItem('daily-max-slots', maxSlots.toString());
+  }, [outcomes, maxSlots]);
 
-  const handleAddOutcome = (slot: 1 | 2 | 3) => {
+  const handleAddOutcome = (slot: 1 | 2 | 3 | 4 | 5) => {
     if (!editText.trim()) return;
 
     const newOutcomeObj = {
@@ -42,7 +48,7 @@ export default function TodayPage() {
     setEditingSlot(null);
   };
 
-  const handleEditOutcome = (slot: 1 | 2 | 3, newTitle: string) => {
+  const handleEditOutcome = (slot: 1 | 2 | 3 | 4 | 5, newTitle: string) => {
     if (!newTitle.trim()) return;
 
     setOutcomes(prev => 
@@ -62,8 +68,12 @@ export default function TodayPage() {
     );
   };
 
-  const getOutcomeForSlot = (slot: 1 | 2 | 3) => {
+  const getOutcomeForSlot = (slot: 1 | 2 | 3 | 4 | 5) => {
     return outcomes.find(o => o.slot === slot);
+  };
+
+  const addMoreSlots = () => {
+    setMaxSlots(5);
   };
 
   return (
@@ -78,8 +88,8 @@ export default function TodayPage() {
       </div>
 
       <div className="space-y-4">
-        {[1, 2, 3].map((slot) => {
-          const outcome = getOutcomeForSlot(slot as 1 | 2 | 3);
+        {Array.from({ length: maxSlots }, (_, i) => i + 1).map((slot) => {
+          const outcome = getOutcomeForSlot(slot as 1 | 2 | 3 | 4 | 5);
           const isEditing = editingSlot === slot;
           
           return (
@@ -105,7 +115,7 @@ export default function TodayPage() {
                           onChange={(e) => setEditText(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              handleEditOutcome(slot as 1 | 2 | 3, editText);
+                              handleEditOutcome(slot as 1 | 2 | 3 | 4 | 5, editText);
                             } else if (e.key === 'Escape') {
                               setEditingSlot(null);
                               setEditText('');
@@ -115,7 +125,7 @@ export default function TodayPage() {
                           autoFocus
                         />
                         <button
-                          onClick={() => handleEditOutcome(slot as 1 | 2 | 3, editText)}
+                          onClick={() => handleEditOutcome(slot as 1 | 2 | 3 | 4 | 5, editText)}
                           className="text-green-600 hover:text-green-700"
                         >
                           <Check size={16} />
@@ -135,7 +145,7 @@ export default function TodayPage() {
                         className={`flex-1 ${outcome.done ? 'line-through text-gray-500' : 'text-gray-900'} cursor-pointer`}
                         onClick={() => {
                           setEditText(outcome.title);
-                          setEditingSlot(slot as 1 | 2 | 3);
+                          setEditingSlot(slot as 1 | 2 | 3 | 4 | 5);
                         }}
                       >
                         {outcome.title}
@@ -153,7 +163,7 @@ export default function TodayPage() {
                         onChange={(e) => setEditText(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            handleAddOutcome(slot as 1 | 2 | 3);
+                            handleAddOutcome(slot as 1 | 2 | 3 | 4 | 5);
                           } else if (e.key === 'Escape') {
                             setEditingSlot(null);
                             setEditText('');
@@ -164,7 +174,7 @@ export default function TodayPage() {
                         autoFocus
                       />
                       <button
-                        onClick={() => handleAddOutcome(slot as 1 | 2 | 3)}
+                        onClick={() => handleAddOutcome(slot as 1 | 2 | 3 | 4 | 5)}
                         className="text-green-600 hover:text-green-700"
                       >
                         <Check size={16} />
@@ -183,7 +193,7 @@ export default function TodayPage() {
                     <>
                       <span className="text-gray-500">No outcome set for slot {slot}</span>
                       <button
-                        onClick={() => setEditingSlot(slot as 1 | 2 | 3)}
+                        onClick={() => setEditingSlot(slot as 1 | 2 | 3 | 4 | 5)}
                         className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
                       >
                         <Plus size={16} />
@@ -196,6 +206,18 @@ export default function TodayPage() {
             </div>
           );
         })}
+
+        {maxSlots < 5 && (
+          <div 
+            className="bg-white rounded-lg shadow-sm border-2 border-dashed border-gray-300 p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            onClick={addMoreSlots}
+          >
+            <div className="flex items-center justify-center space-x-2 text-gray-500 hover:text-blue-600">
+              <Plus size={20} />
+              <span className="font-medium">Add 2 more outcomes</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

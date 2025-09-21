@@ -7,6 +7,7 @@ export default function FiveYearPage() {
   const [goals, setGoals] = useState<any[]>([]);
   const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
   const [editText, setEditText] = useState('');
+  const [maxSlots, setMaxSlots] = useState(3);
 
   const currentYear = new Date().getFullYear();
   const fiveYearPeriod = `${currentYear}-${currentYear + 4}`;
@@ -17,12 +18,17 @@ export default function FiveYearPage() {
     if (savedGoals) {
       setGoals(JSON.parse(savedGoals));
     }
+    const savedMaxSlots = localStorage.getItem('five-year-max-slots');
+    if (savedMaxSlots) {
+      setMaxSlots(parseInt(savedMaxSlots));
+    }
   }, []);
 
   // Save goals to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('five-year-goals', JSON.stringify(goals));
-  }, [goals]);
+    localStorage.setItem('five-year-max-slots', maxSlots.toString());
+  }, [goals, maxSlots]);
 
   const handleAddGoal = (slot: 1 | 2 | 3 | 4 | 5) => {
     if (!editText.trim()) return;
@@ -69,6 +75,10 @@ export default function FiveYearPage() {
     return goals.find(g => g.slot === slot);
   };
 
+  const addMoreSlots = () => {
+    setMaxSlots(5);
+  };
+
   return (
     <div className="p-4">
       <div className="mb-6">
@@ -81,7 +91,7 @@ export default function FiveYearPage() {
       </div>
 
       <div className="space-y-4">
-        {[1, 2, 3, 4, 5].map((slot) => {
+        {Array.from({ length: maxSlots }, (_, i) => i + 1).map((slot) => {
           const goal = getGoalForSlot(slot as 1 | 2 | 3 | 4 | 5);
           const isEditing = editingSlot === slot;
           
@@ -210,6 +220,18 @@ export default function FiveYearPage() {
             </div>
           );
         })}
+
+        {maxSlots < 5 && (
+          <div 
+            className="bg-white rounded-lg shadow-sm border-2 border-dashed border-gray-300 p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            onClick={addMoreSlots}
+          >
+            <div className="flex items-center justify-center space-x-2 text-gray-500 hover:text-blue-600">
+              <Plus size={20} />
+              <span className="font-medium">Add 2 more goals</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
