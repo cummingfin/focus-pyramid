@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { formatDate, getMonthStart, getMonthName, getYear } from '@/lib/dates';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 
 export default function MonthPage() {
   const [goals, setGoals] = useState<any[]>([]);
-  const [newGoal, setNewGoal] = useState('');
-  const [selectedSlot, setSelectedSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
+  const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
+  const [editText, setEditText] = useState('');
 
   const monthStart = getMonthStart();
   const currentMonth = `${getMonthName()} ${getYear()}`;
@@ -26,14 +26,14 @@ export default function MonthPage() {
   }, [goals]);
 
   const handleAddGoal = (slot: 1 | 2 | 3 | 4 | 5) => {
-    if (!newGoal.trim()) return;
+    if (!editText.trim()) return;
 
     const newGoalObj = {
       id: Date.now().toString(),
       slot,
-      title: newGoal.trim(),
+      title: editText.trim(),
       done: false,
-      area: 'work', // Default to work
+      area: 'work',
       created_at: new Date().toISOString()
     };
 
@@ -42,8 +42,20 @@ export default function MonthPage() {
       return [...filtered, newGoalObj];
     });
 
-    setNewGoal('');
-    setSelectedSlot(null);
+    setEditText('');
+    setEditingSlot(null);
+  };
+
+  const handleEditGoal = (slot: 1 | 2 | 3 | 4 | 5, newTitle: string) => {
+    if (!newTitle.trim()) return;
+
+    setGoals(prev => 
+      prev.map(g => 
+        g.slot === slot ? { ...g, title: newTitle.trim() } : g
+      )
+    );
+    setEditingSlot(null);
+    setEditText('');
   };
 
   const toggleGoal = (goalId: string) => {
@@ -72,12 +84,13 @@ export default function MonthPage() {
       <div className="space-y-4">
         {[1, 2, 3, 4, 5].map((slot) => {
           const goal = getGoalForSlot(slot as 1 | 2 | 3 | 4 | 5);
+          const isEditing = editingSlot === slot;
           
           return (
             <div key={slot} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               {goal ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 flex-1">
                     <button
                       onClick={() => toggleGoal(goal.id)}
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
@@ -88,71 +101,117 @@ export default function MonthPage() {
                     >
                       {goal.done && <Check size={14} />}
                     </button>
-                    <div className="flex-1">
-                      <span className={`${goal.done ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                        {goal.title}
-                      </span>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          goal.area === 'work' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-purple-100 text-purple-800'
-                        }`}>
-                          {goal.area}
-                        </span>
+                    {isEditing ? (
+                      <div className="flex-1 flex items-center space-x-2">
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleEditGoal(slot as 1 | 2 | 3 | 4 | 5, editText);
+                            } else if (e.key === 'Escape') {
+                              setEditingSlot(null);
+                              setEditText('');
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleEditGoal(slot as 1 | 2 | 3 | 4 | 5, editText)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingSlot(null);
+                            setEditText('');
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex-1">
+                        <span 
+                          className={`${goal.done ? 'line-through text-gray-500' : 'text-gray-900'} cursor-pointer`}
+                          onClick={() => {
+                            setEditText(goal.title);
+                            setEditingSlot(slot as 1 | 2 | 3 | 4 | 5);
+                          }}
+                        >
+                          {goal.title}
+                        </span>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            goal.area === 'work' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {goal.area}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">No goal set for slot {slot}</span>
-                  <button
-                    onClick={() => setSelectedSlot(slot as 1 | 2 | 3 | 4 | 5)}
-                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
-                  >
-                    <Plus size={16} />
-                    <span>Add</span>
-                  </button>
+                  {isEditing ? (
+                    <div className="flex-1 flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddGoal(slot as 1 | 2 | 3 | 4 | 5);
+                          } else if (e.key === 'Escape') {
+                            setEditingSlot(null);
+                            setEditText('');
+                          }
+                        }}
+                        placeholder="What do you want to achieve this month?"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleAddGoal(slot as 1 | 2 | 3 | 4 | 5)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingSlot(null);
+                          setEditText('');
+                        }}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-gray-500">No goal set for slot {slot}</span>
+                      <button
+                        onClick={() => setEditingSlot(slot as 1 | 2 | 3 | 4 | 5)}
+                        className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
+                      >
+                        <Plus size={16} />
+                        <span>Add</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
-
-      {selectedSlot && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add Monthly Goal</h3>
-            <input
-              type="text"
-              value={newGoal}
-              onChange={(e) => setNewGoal(e.target.value)}
-              placeholder="What do you want to achieve this month?"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              autoFocus
-            />
-            <div className="flex space-x-3">
-              <button
-                onClick={() => handleAddGoal(selectedSlot)}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedSlot(null);
-                  setNewGoal('');
-                }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

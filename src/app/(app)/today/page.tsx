@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { formatDate, todayUTC } from '@/lib/dates';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 
 export default function TodayPage() {
   const [outcomes, setOutcomes] = useState<any[]>([]);
-  const [newOutcome, setNewOutcome] = useState('');
-  const [selectedSlot, setSelectedSlot] = useState<1 | 2 | 3 | null>(null);
+  const [editingSlot, setEditingSlot] = useState<1 | 2 | 3 | null>(null);
+  const [editText, setEditText] = useState('');
 
   // Load outcomes from localStorage on component mount
   useEffect(() => {
@@ -23,12 +23,12 @@ export default function TodayPage() {
   }, [outcomes]);
 
   const handleAddOutcome = (slot: 1 | 2 | 3) => {
-    if (!newOutcome.trim()) return;
+    if (!editText.trim()) return;
 
     const newOutcomeObj = {
       id: Date.now().toString(),
       slot,
-      title: newOutcome.trim(),
+      title: editText.trim(),
       done: false,
       created_at: new Date().toISOString()
     };
@@ -38,8 +38,20 @@ export default function TodayPage() {
       return [...filtered, newOutcomeObj];
     });
 
-    setNewOutcome('');
-    setSelectedSlot(null);
+    setEditText('');
+    setEditingSlot(null);
+  };
+
+  const handleEditOutcome = (slot: 1 | 2 | 3, newTitle: string) => {
+    if (!newTitle.trim()) return;
+
+    setOutcomes(prev => 
+      prev.map(o => 
+        o.slot === slot ? { ...o, title: newTitle.trim() } : o
+      )
+    );
+    setEditingSlot(null);
+    setEditText('');
   };
 
   const toggleOutcome = (outcomeId: string) => {
@@ -68,12 +80,13 @@ export default function TodayPage() {
       <div className="space-y-4">
         {[1, 2, 3].map((slot) => {
           const outcome = getOutcomeForSlot(slot as 1 | 2 | 3);
+          const isEditing = editingSlot === slot;
           
           return (
             <div key={slot} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               {outcome ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 flex-1">
                     <button
                       onClick={() => toggleOutcome(outcome.id)}
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
@@ -84,60 +97,106 @@ export default function TodayPage() {
                     >
                       {outcome.done && <Check size={14} />}
                     </button>
-                    <span className={`${outcome.done ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                      {outcome.title}
-                    </span>
+                    {isEditing ? (
+                      <div className="flex-1 flex items-center space-x-2">
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleEditOutcome(slot as 1 | 2 | 3, editText);
+                            } else if (e.key === 'Escape') {
+                              setEditingSlot(null);
+                              setEditText('');
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleEditOutcome(slot as 1 | 2 | 3, editText)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingSlot(null);
+                            setEditText('');
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span 
+                        className={`flex-1 ${outcome.done ? 'line-through text-gray-500' : 'text-gray-900'} cursor-pointer`}
+                        onClick={() => {
+                          setEditText(outcome.title);
+                          setEditingSlot(slot as 1 | 2 | 3);
+                        }}
+                      >
+                        {outcome.title}
+                      </span>
+                    )}
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">No outcome set for slot {slot}</span>
-                  <button
-                    onClick={() => setSelectedSlot(slot as 1 | 2 | 3)}
-                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
-                  >
-                    <Plus size={16} />
-                    <span>Add</span>
-                  </button>
+                  {isEditing ? (
+                    <div className="flex-1 flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddOutcome(slot as 1 | 2 | 3);
+                          } else if (e.key === 'Escape') {
+                            setEditingSlot(null);
+                            setEditText('');
+                          }
+                        }}
+                        placeholder="What do you want to achieve today?"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleAddOutcome(slot as 1 | 2 | 3)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingSlot(null);
+                          setEditText('');
+                        }}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-gray-500">No outcome set for slot {slot}</span>
+                      <button
+                        onClick={() => setEditingSlot(slot as 1 | 2 | 3)}
+                        className="flex items-center space-x-1 text-blue-600 hover:text-blue-700"
+                      >
+                        <Plus size={16} />
+                        <span>Add</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
-
-      {selectedSlot && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add Daily Outcome</h3>
-            <input
-              type="text"
-              value={newOutcome}
-              onChange={(e) => setNewOutcome(e.target.value)}
-              placeholder="What do you want to achieve today?"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              autoFocus
-            />
-            <div className="flex space-x-3">
-              <button
-                onClick={() => handleAddOutcome(selectedSlot)}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedSlot(null);
-                  setNewOutcome('');
-                }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
