@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { formatDate, todayUTC, getWeekStart, getMonthName, getYear } from '@/lib/dates';
-import { Check, Plus, X, Link as LinkIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function PyramidPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -155,7 +155,7 @@ export default function PyramidPage() {
 
     setMaxSlots(prev => ({
       ...prev,
-      [slideKey]: prev[slideKey] + 1 // Add just one more slot
+      [slideKey]: prev[slideKey] + 1
     }));
   };
 
@@ -178,41 +178,51 @@ export default function PyramidPage() {
 
   const slides = [
     {
-      title: "Today's Focus",
-      subtitle: formatDate(todayUTC(), 'EEEE, MMMM do'),
-      color: 'bg-gradient-to-br from-red-500 to-red-700',
+      title: "Today",
+      subtitle: formatDate(todayUTC(), 'EEEE, MMMM d'),
+      bgColor: 'bg-white',
+      accentColor: 'text-red-500',
+      progressColor: 'bg-red-500',
       goals: allGoals.daily,
       maxSlots: maxSlots.daily,
       key: 'daily'
     },
     {
-      title: "Weekly Goals",
-      subtitle: `Week of ${formatDate(getWeekStart(), 'MMM dd')}`,
-      color: 'bg-gradient-to-br from-orange-500 to-orange-700',
+      title: "This Week",
+      subtitle: `Week of ${formatDate(getWeekStart(), 'MMM d')}`,
+      bgColor: 'bg-white',
+      accentColor: 'text-orange-500',
+      progressColor: 'bg-orange-500',
       goals: allGoals.weekly,
       maxSlots: maxSlots.weekly,
       key: 'weekly'
     },
     {
-      title: "Monthly Goals",
+      title: "This Month",
       subtitle: `${getMonthName()} ${getYear()}`,
-      color: 'bg-gradient-to-br from-green-500 to-green-700',
+      bgColor: 'bg-white',
+      accentColor: 'text-green-500',
+      progressColor: 'bg-green-500',
       goals: allGoals.monthly,
       maxSlots: maxSlots.monthly,
       key: 'monthly'
     },
     {
-      title: "Yearly Goals",
+      title: "This Year",
       subtitle: getYear().toString(),
-      color: 'bg-gradient-to-br from-blue-500 to-blue-700',
+      bgColor: 'bg-white',
+      accentColor: 'text-blue-500',
+      progressColor: 'bg-blue-500',
       goals: allGoals.yearly,
       maxSlots: maxSlots.yearly,
       key: 'yearly'
     },
     {
       title: "5-Year Vision",
-      subtitle: `${getYear()}-${getYear() + 4}`,
-      color: 'bg-gradient-to-br from-purple-500 to-purple-700',
+      subtitle: `${getYear()} - ${getYear() + 4}`,
+      bgColor: 'bg-white',
+      accentColor: 'text-purple-500',
+      progressColor: 'bg-purple-500',
       goals: allGoals.fiveYear,
       maxSlots: maxSlots.fiveYear,
       key: 'fiveYear'
@@ -234,15 +244,15 @@ export default function PyramidPage() {
   return (
     <div className="h-screen bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 px-4 py-4">
-        <h1 className="text-2xl font-bold text-gray-900 text-center">Focus Pyramid</h1>
-        <div className="flex justify-center mt-2 space-x-2">
+      <div className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-4 py-6">
+        <h1 className="text-2xl font-semibold text-gray-900 text-center tracking-tight">Focus</h1>
+        <div className="flex justify-center mt-3 space-x-1.5">
           {slides.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                index === currentSlide ? 'bg-blue-600' : 'bg-gray-300'
+              className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                index === currentSlide ? 'bg-blue-500 scale-125' : 'bg-gray-300'
               }`}
             />
           ))}
@@ -259,45 +269,47 @@ export default function PyramidPage() {
         {/* Navigation Arrows */}
         <button
           onClick={prevSlide}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow"
+          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:shadow-xl hover:bg-white transition-all duration-200"
         >
-          <ChevronLeft size={24} className="text-gray-600" />
+          <ChevronLeft size={20} className="text-gray-600" />
         </button>
         
         <button
           onClick={nextSlide}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow"
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg hover:shadow-xl hover:bg-white transition-all duration-200"
         >
-          <ChevronRight size={24} className="text-gray-600" />
+          <ChevronRight size={20} className="text-gray-600" />
         </button>
 
         {/* Slides Container */}
         <div 
           ref={carouselRef}
-          className="flex h-full transition-transform duration-300 ease-in-out"
+          className="flex h-full transition-transform duration-300 ease-out"
           style={{ transform: `translateX(-${currentSlide * 100}%)` }}
         >
           {slides.map((slide, slideIndex) => {
             const progress = getProgressForHorizon(slide.goals);
             
             return (
-              <div key={slide.key} className="w-full flex-shrink-0 px-6 py-6">
-                <div className={`${slide.color} rounded-2xl p-6 h-full flex flex-col shadow-xl`}>
+              <div key={slide.key} className="w-full flex-shrink-0 px-6 py-8">
+                <div className={`${slide.bgColor} rounded-3xl shadow-sm border border-gray-200/50 p-8 h-full flex flex-col`}>
                   {/* Header */}
-                  <div className="text-center mb-6">
-                    <h2 className="text-2xl font-bold text-white mb-2">{slide.title}</h2>
-                    <p className="text-white/80 text-lg">{slide.subtitle}</p>
+                  <div className="text-center mb-8">
+                    <h2 className={`text-3xl font-semibold ${slide.accentColor} mb-2 tracking-tight`}>
+                      {slide.title}
+                    </h2>
+                    <p className="text-gray-500 text-lg font-medium">{slide.subtitle}</p>
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="mb-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-white font-medium">Progress</span>
-                      <span className="text-white text-2xl font-bold">{progress}%</span>
+                  <div className="mb-8">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-gray-600 font-medium text-sm">Progress</span>
+                      <span className={`${slide.accentColor} text-2xl font-semibold`}>{progress}%</span>
                     </div>
-                    <div className="bg-white/20 rounded-full h-3">
+                    <div className="bg-gray-200 rounded-full h-2">
                       <div 
-                        className="bg-white rounded-full h-3 transition-all duration-500"
+                        className={`${slide.progressColor} rounded-full h-2 transition-all duration-500 ease-out`}
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -308,46 +320,46 @@ export default function PyramidPage() {
                     {Array.from({ length: slide.maxSlots }, (_, i) => i + 1).map((slot) => {
                       const goal = getGoalForSlot(slideIndex, slot);
                       const isEditing = editingSlot?.slide === slideIndex && editingSlot?.slot === slot;
-                      const isPriority = slot <= 3; // First 3 slots are priority
-                      const isOptional = slot > 3; // Slots 4-5 are optional
+                      const isPriority = slot <= 3;
+                      const isOptional = slot > 3;
                       
                       return (
                         <div 
                           key={slot} 
-                          className={`rounded-lg p-4 transition-all ${
+                          className={`rounded-2xl p-4 transition-all duration-200 ${
                             isPriority 
-                              ? 'bg-white/10 backdrop-blur-sm' 
-                              : 'bg-white/5 backdrop-blur-sm border border-white/20'
+                              ? 'bg-gray-50 border border-gray-200/50' 
+                              : 'bg-gray-25 border border-gray-100/50'
                           }`}
                         >
                           {/* Priority indicator */}
                           {isPriority && (
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="w-2 h-2 bg-white rounded-full"></div>
-                              <span className="text-white/80 text-xs font-medium">PRIORITY</span>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className={`w-1.5 h-1.5 ${slide.progressColor} rounded-full`}></div>
+                              <span className="text-gray-500 text-xs font-medium tracking-wide">PRIORITY</span>
                             </div>
                           )}
                           
                           {isOptional && (
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-                              <span className="text-white/60 text-xs font-medium">OPTIONAL</span>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                              <span className="text-gray-400 text-xs font-medium tracking-wide">OPTIONAL</span>
                             </div>
                           )}
 
                           {goal ? (
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-4">
                               <button
                                 onClick={() => toggleGoal(slideIndex, goal.id)}
-                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
                                   goal.done
-                                    ? 'bg-white border-white'
+                                    ? `${slide.progressColor} border-transparent`
                                     : isPriority 
-                                      ? 'border-white/80 hover:border-white' 
-                                      : 'border-white/40 hover:border-white/60'
+                                      ? 'border-gray-400 hover:border-gray-500' 
+                                      : 'border-gray-300 hover:border-gray-400'
                                 }`}
                               >
-                                {goal.done && <Check size={14} className="text-blue-600" />}
+                                {goal.done && <Check size={14} className="text-white" />}
                               </button>
                               {isEditing ? (
                                 <div className="flex-1 flex items-center space-x-2">
@@ -363,12 +375,12 @@ export default function PyramidPage() {
                                         setEditText('');
                                       }
                                     }}
-                                    className="flex-1 px-3 py-2 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-white/50 text-gray-900"
+                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-gray-900 placeholder-gray-400"
                                     autoFocus
                                   />
                                   <button
                                     onClick={() => handleEditGoal(slideIndex, slot, editText)}
-                                    className="text-white hover:text-white/80"
+                                    className="text-green-500 hover:text-green-600 transition-colors"
                                   >
                                     <Check size={16} />
                                   </button>
@@ -377,7 +389,7 @@ export default function PyramidPage() {
                                       setEditingSlot(null);
                                       setEditText('');
                                     }}
-                                    className="text-white hover:text-white/80"
+                                    className="text-red-500 hover:text-red-600 transition-colors"
                                   >
                                     <X size={16} />
                                   </button>
@@ -386,10 +398,10 @@ export default function PyramidPage() {
                                 <span 
                                   className={`flex-1 cursor-pointer transition-colors ${
                                     goal.done 
-                                      ? 'line-through opacity-70' 
+                                      ? 'line-through text-gray-400' 
                                       : isPriority 
-                                        ? 'text-white' 
-                                        : 'text-white/70'
+                                        ? 'text-gray-900' 
+                                        : 'text-gray-600'
                                   }`}
                                   onClick={() => {
                                     setEditText(goal.title);
@@ -417,12 +429,12 @@ export default function PyramidPage() {
                                       }
                                     }}
                                     placeholder={`What do you want to achieve ${slide.key === 'daily' ? 'today' : slide.key === 'weekly' ? 'this week' : slide.key === 'monthly' ? 'this month' : slide.key === 'yearly' ? 'this year' : 'in 5 years'}?`}
-                                    className="flex-1 px-3 py-2 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-white/50 text-gray-900"
+                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-gray-900 placeholder-gray-400"
                                     autoFocus
                                   />
                                   <button
                                     onClick={() => handleAddGoal(slideIndex, slot)}
-                                    className="text-white hover:text-white/80"
+                                    className="text-green-500 hover:text-green-600 transition-colors"
                                   >
                                     <Check size={16} />
                                   </button>
@@ -431,26 +443,26 @@ export default function PyramidPage() {
                                       setEditingSlot(null);
                                       setEditText('');
                                     }}
-                                    className="text-white hover:text-white/80"
+                                    className="text-red-500 hover:text-red-600 transition-colors"
                                   >
                                     <X size={16} />
                                   </button>
                                 </div>
                               ) : (
                                 <>
-                                  <span className={`${isPriority ? 'text-white/60' : 'text-white/40'}`}>
-                                    No goal set for slot {slot}
+                                  <span className={`${isPriority ? 'text-gray-500' : 'text-gray-400'} text-sm`}>
+                                    No goal set
                                   </span>
                                   <button
                                     onClick={() => setEditingSlot({ slide: slideIndex, slot })}
                                     className={`flex items-center space-x-1 transition-colors ${
                                       isPriority 
-                                        ? 'text-white hover:text-white/80' 
-                                        : 'text-white/70 hover:text-white/90'
+                                        ? 'text-blue-500 hover:text-blue-600' 
+                                        : 'text-gray-400 hover:text-gray-500'
                                     }`}
                                   >
                                     <Plus size={16} />
-                                    <span>Add</span>
+                                    <span className="text-sm font-medium">Add</span>
                                   </button>
                                 </>
                               )}
@@ -462,14 +474,12 @@ export default function PyramidPage() {
 
                     {slide.maxSlots < 5 && (
                       <div 
-                        className="bg-white/10 backdrop-blur-sm border-2 border-dashed border-white/30 rounded-lg p-4 cursor-pointer hover:bg-white/20 transition-colors"
+                        className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl p-4 cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-all duration-200"
                         onClick={() => addMoreSlots(slideIndex)}
                       >
-                        <div className="flex items-center justify-center space-x-2 text-white/80">
+                        <div className="flex items-center justify-center space-x-2 text-gray-500">
                           <Plus size={20} />
-                          <span className="font-medium">
-                            Add {slide.maxSlots === 3 ? '1 more goal' : '1 more goal'}
-                          </span>
+                          <span className="font-medium text-sm">Add 1 more goal</span>
                         </div>
                       </div>
                     )}
