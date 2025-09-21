@@ -155,7 +155,7 @@ export default function PyramidPage() {
 
     setMaxSlots(prev => ({
       ...prev,
-      [slideKey]: 5
+      [slideKey]: prev[slideKey] + 1 // Add just one more slot
     }));
   };
 
@@ -308,9 +308,33 @@ export default function PyramidPage() {
                     {Array.from({ length: slide.maxSlots }, (_, i) => i + 1).map((slot) => {
                       const goal = getGoalForSlot(slideIndex, slot);
                       const isEditing = editingSlot?.slide === slideIndex && editingSlot?.slot === slot;
+                      const isPriority = slot <= 3; // First 3 slots are priority
+                      const isOptional = slot > 3; // Slots 4-5 are optional
                       
                       return (
-                        <div key={slot} className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                        <div 
+                          key={slot} 
+                          className={`rounded-lg p-4 transition-all ${
+                            isPriority 
+                              ? 'bg-white/10 backdrop-blur-sm' 
+                              : 'bg-white/5 backdrop-blur-sm border border-white/20'
+                          }`}
+                        >
+                          {/* Priority indicator */}
+                          {isPriority && (
+                            <div className="flex items-center space-x-2 mb-2">
+                              <div className="w-2 h-2 bg-white rounded-full"></div>
+                              <span className="text-white/80 text-xs font-medium">PRIORITY</span>
+                            </div>
+                          )}
+                          
+                          {isOptional && (
+                            <div className="flex items-center space-x-2 mb-2">
+                              <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                              <span className="text-white/60 text-xs font-medium">OPTIONAL</span>
+                            </div>
+                          )}
+
                           {goal ? (
                             <div className="flex items-center space-x-3">
                               <button
@@ -318,7 +342,9 @@ export default function PyramidPage() {
                                 className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
                                   goal.done
                                     ? 'bg-white border-white'
-                                    : 'border-white/60 hover:border-white'
+                                    : isPriority 
+                                      ? 'border-white/80 hover:border-white' 
+                                      : 'border-white/40 hover:border-white/60'
                                 }`}
                               >
                                 {goal.done && <Check size={14} className="text-blue-600" />}
@@ -358,8 +384,12 @@ export default function PyramidPage() {
                                 </div>
                               ) : (
                                 <span 
-                                  className={`flex-1 text-white cursor-pointer ${
-                                    goal.done ? 'line-through opacity-70' : ''
+                                  className={`flex-1 cursor-pointer transition-colors ${
+                                    goal.done 
+                                      ? 'line-through opacity-70' 
+                                      : isPriority 
+                                        ? 'text-white' 
+                                        : 'text-white/70'
                                   }`}
                                   onClick={() => {
                                     setEditText(goal.title);
@@ -408,10 +438,16 @@ export default function PyramidPage() {
                                 </div>
                               ) : (
                                 <>
-                                  <span className="text-white/60">No goal set for slot {slot}</span>
+                                  <span className={`${isPriority ? 'text-white/60' : 'text-white/40'}`}>
+                                    No goal set for slot {slot}
+                                  </span>
                                   <button
                                     onClick={() => setEditingSlot({ slide: slideIndex, slot })}
-                                    className="flex items-center space-x-1 text-white hover:text-white/80"
+                                    className={`flex items-center space-x-1 transition-colors ${
+                                      isPriority 
+                                        ? 'text-white hover:text-white/80' 
+                                        : 'text-white/70 hover:text-white/90'
+                                    }`}
                                   >
                                     <Plus size={16} />
                                     <span>Add</span>
@@ -431,7 +467,9 @@ export default function PyramidPage() {
                       >
                         <div className="flex items-center justify-center space-x-2 text-white/80">
                           <Plus size={20} />
-                          <span className="font-medium">Add 2 more goals</span>
+                          <span className="font-medium">
+                            Add {slide.maxSlots === 3 ? '1 more goal' : '1 more goal'}
+                          </span>
                         </div>
                       </div>
                     )}
