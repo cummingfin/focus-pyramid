@@ -1,20 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { formatDate, getYearStart, getYear } from '@/lib/dates';
 import { Check, Plus } from 'lucide-react';
 
-export default function YearPage() {
+export default function FiveYearPage() {
   const [goals, setGoals] = useState<any[]>([]);
   const [newGoal, setNewGoal] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
 
-  const yearStart = getYearStart();
-  const currentYear = getYear();
+  const currentYear = new Date().getFullYear();
+  const fiveYearPeriod = `${currentYear}-${currentYear + 4}`;
 
   // Load goals from localStorage on component mount
   useEffect(() => {
-    const savedGoals = localStorage.getItem('yearly-goals');
+    const savedGoals = localStorage.getItem('five-year-goals');
     if (savedGoals) {
       setGoals(JSON.parse(savedGoals));
     }
@@ -22,7 +21,7 @@ export default function YearPage() {
 
   // Save goals to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('yearly-goals', JSON.stringify(goals));
+    localStorage.setItem('five-year-goals', JSON.stringify(goals));
   }, [goals]);
 
   const handleAddGoal = (slot: 1 | 2 | 3 | 4 | 5) => {
@@ -62,10 +61,10 @@ export default function YearPage() {
     <div className="p-4">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Yearly Goals
+          5-Year Vision
         </h1>
         <p className="text-gray-600">
-          {currentYear}
+          {fiveYearPeriod}
         </p>
       </div>
 
@@ -124,12 +123,12 @@ export default function YearPage() {
       {selectedSlot && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add Yearly Goal</h3>
+            <h3 className="text-lg font-semibold mb-4">Add 5-Year Goal</h3>
             <input
               type="text"
               value={newGoal}
               onChange={(e) => setNewGoal(e.target.value)}
-              placeholder="What do you want to achieve this year?"
+              placeholder="What do you want to achieve in the next 5 years?"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
               autoFocus
             />

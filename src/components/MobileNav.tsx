@@ -2,13 +2,14 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Target, TrendingUp, Clock, History, Settings } from 'lucide-react';
+import { Calendar, Target, TrendingUp, Clock, History, Settings, Star } from 'lucide-react';
 
 const navItems = [
   { href: '/today', icon: Calendar, label: 'Today' },
   { href: '/week', icon: Target, label: 'Week' },
   { href: '/month', icon: TrendingUp, label: 'Month' },
   { href: '/year', icon: Clock, label: 'Year' },
+  { href: '/five-year', icon: Star, label: '5-Year' },
   { href: '/history', icon: History, label: 'History' },
   { href: '/settings', icon: Settings, label: 'Settings' },
 ];
