@@ -36,7 +36,14 @@ const getCurrentUserAndWorkspace = async () => {
 
   console.log('Membership query result:', membership, 'Error:', error);
   
-  return { user, workspaceId: membership?.workspace_id };
+  // If no membership exists or there's an error, create workspace and membership
+  if (!membership || error) {
+    console.log('No membership found or error, creating workspace...');
+    const workspaceId = await ensureWorkspace(user.id);
+    return { user, workspaceId };
+  }
+  
+  return { user, workspaceId: membership.workspace_id };
 };
 
 // Ensure workspace exists for user
@@ -44,7 +51,7 @@ const ensureWorkspace = async (userId: string) => {
   try {
     console.log('Ensuring workspace for user:', userId);
     
-    // Check if user already has a workspace
+    // Check if user already has a workspace (ignore errors due to RLS)
     const { data: existingMembership, error: membershipCheckError } = await supabase
       .from('memberships')
       .select('workspace_id')
@@ -56,6 +63,11 @@ const ensureWorkspace = async (userId: string) => {
     if (existingMembership) {
       console.log('User already has workspace:', existingMembership.workspace_id);
       return existingMembership.workspace_id;
+    }
+
+    // If there's an error (like RLS blocking), we'll still try to create a workspace
+    if (membershipCheckError) {
+      console.log('Membership check failed (likely RLS), proceeding to create workspace...');
     }
 
     console.log('Creating new workspace...');
@@ -72,6 +84,7 @@ const ensureWorkspace = async (userId: string) => {
 
     if (workspaceError) {
       console.error('Error creating workspace:', workspaceError);
+      // If workspace creation fails due to RLS, return null and fall back to localStorage
       return null;
     }
 
@@ -88,7 +101,9 @@ const ensureWorkspace = async (userId: string) => {
 
     if (membershipError) {
       console.error('Error creating membership:', membershipError);
-      return null;
+      // If membership creation fails, we still have the workspace, so return it
+      console.log('Membership creation failed, but workspace exists:', workspace.id);
+      return workspace.id;
     }
 
     console.log('Membership created successfully');
