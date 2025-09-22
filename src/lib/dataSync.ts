@@ -23,32 +23,43 @@ interface UserData {
 // Get current user and their workspace
 const getCurrentUserAndWorkspace = async () => {
   const { data: { user } } = await supabase.auth.getUser();
+  console.log('Getting user and workspace - User:', user?.email);
+  
   if (!user) return { user: null, workspaceId: null };
 
   // Get user's workspace
-  const { data: membership } = await supabase
+  const { data: membership, error } = await supabase
     .from('memberships')
     .select('workspace_id')
     .eq('user_id', user.id)
     .single();
 
+  console.log('Membership query result:', membership, 'Error:', error);
+  
   return { user, workspaceId: membership?.workspace_id };
 };
 
 // Ensure workspace exists for user
 const ensureWorkspace = async (userId: string) => {
   try {
+    console.log('Ensuring workspace for user:', userId);
+    
     // Check if user already has a workspace
-    const { data: existingMembership } = await supabase
+    const { data: existingMembership, error: membershipCheckError } = await supabase
       .from('memberships')
       .select('workspace_id')
       .eq('user_id', userId)
       .single();
 
+    console.log('Existing membership check:', existingMembership, 'Error:', membershipCheckError);
+
     if (existingMembership) {
+      console.log('User already has workspace:', existingMembership.workspace_id);
       return existingMembership.workspace_id;
     }
 
+    console.log('Creating new workspace...');
+    
     // Create new workspace
     const { data: workspace, error: workspaceError } = await supabase
       .from('workspaces')
@@ -64,6 +75,8 @@ const ensureWorkspace = async (userId: string) => {
       return null;
     }
 
+    console.log('Workspace created:', workspace.id);
+
     // Create membership
     const { error: membershipError } = await supabase
       .from('memberships')
@@ -78,6 +91,7 @@ const ensureWorkspace = async (userId: string) => {
       return null;
     }
 
+    console.log('Membership created successfully');
     return workspace.id;
   } catch (error) {
     console.error('Error ensuring workspace:', error);
@@ -127,10 +141,16 @@ const getDefaultArea = async (workspaceId: string) => {
 export const saveGoalsToSupabase = async (horizon: string, goals: Goal[]) => {
   try {
     const { user, workspaceId } = await getCurrentUserAndWorkspace();
-    if (!user || !workspaceId) return;
+    console.log('Save goals - User:', user?.email, 'WorkspaceId:', workspaceId);
+    
+    if (!user || !workspaceId) {
+      console.log('No user or workspace, falling back to localStorage');
+      return;
+    }
 
     // Ensure default area exists
     const areaId = await getDefaultArea(workspaceId);
+    console.log('Area ID:', areaId);
     if (!areaId) return;
 
     // Clear existing goals for this horizon
