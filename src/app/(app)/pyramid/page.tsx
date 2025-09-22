@@ -383,7 +383,7 @@ export default function PyramidPage() {
                   </div>
 
                   {/* Goals List */}
-                  <div className="flex-1 space-y-3 overflow-y-auto">
+                  <div className="flex-1 space-y-3 overflow-y-auto pb-4">
                     {Array.from({ length: slide.maxSlots }, (_, i) => i + 1).map((slot) => {
                       const goal = getGoalForSlot(slideIndex, slot);
                       const isEditing = editingSlot?.slide === slideIndex && editingSlot?.slot === slot;
