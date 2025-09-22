@@ -30,15 +30,14 @@ export default function AppLayout({
         // For now, just set a dummy workspace ID to make the app work
         setCurrentWorkspace('demo-workspace');
         
+        setIsLoading(false);
+        setLoading(false);
+        
         // Redirect to pyramid page if user lands on any other app route
         const currentPath = window.location.pathname;
         if (currentPath === '/' || currentPath === '/today') {
           router.push('/pyramid');
-          return;
         }
-        
-        setIsLoading(false);
-        setLoading(false);
       } catch (error) {
         console.error('Auth initialization error:', error);
         router.push('/login');
@@ -85,7 +84,7 @@ export default function AppLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="pb-20">
+      <main className="pb-24">
         {children}
       </main>
       <MobileNav />

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { formatDate, todayUTC, getWeekStart, getMonthName, getYear } from '@/lib/dates';
 import { Check, Plus, X, ChevronLeft, ChevronRight, Link as LinkIcon, Trophy } from 'lucide-react';
+import { syncUserData, saveUserData } from '@/lib/dataSync';
 
 export default function PyramidPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -27,36 +28,53 @@ export default function PyramidPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const weekKey = formatDate(getWeekStart(), 'yyyy-MM-dd');
 
-  // Load all goals from localStorage
+  // Load all goals from Supabase/localStorage
   useEffect(() => {
-    const dailyGoals = JSON.parse(localStorage.getItem('daily-outcomes') || '[]');
-    const weeklyGoals = JSON.parse(localStorage.getItem(`weekly-goals-${weekKey}`) || '[]');
-    const monthlyGoals = JSON.parse(localStorage.getItem('monthly-goals') || '[]');
-    const yearlyGoals = JSON.parse(localStorage.getItem('yearly-goals') || '[]');
-    const fiveYearGoals = JSON.parse(localStorage.getItem('five-year-goals') || '[]');
+    const loadData = async () => {
+      try {
+        const userData = await syncUserData();
+        setAllGoals({
+          daily: userData.daily,
+          weekly: userData.weekly,
+          monthly: userData.monthly,
+          yearly: userData.yearly,
+          fiveYear: userData.fiveYear
+        });
 
-    setAllGoals({
-      daily: dailyGoals,
-      weekly: weeklyGoals,
-      monthly: monthlyGoals,
-      yearly: yearlyGoals,
-      fiveYear: fiveYearGoals
-    });
+        // Load max slots from localStorage (these are UI state, not user data)
+        const dailyMax = parseInt(localStorage.getItem('daily-max-slots') || '3');
+        const weeklyMax = parseInt(localStorage.getItem(`weekly-max-slots-${weekKey}`) || '3');
+        const monthlyMax = parseInt(localStorage.getItem('monthly-max-slots') || '3');
+        const yearlyMax = parseInt(localStorage.getItem('yearly-max-slots') || '3');
+        const fiveYearMax = parseInt(localStorage.getItem('five-year-max-slots') || '3');
 
-    // Load max slots
-    const dailyMax = parseInt(localStorage.getItem('daily-max-slots') || '3');
-    const weeklyMax = parseInt(localStorage.getItem(`weekly-max-slots-${weekKey}`) || '3');
-    const monthlyMax = parseInt(localStorage.getItem('monthly-max-slots') || '3');
-    const yearlyMax = parseInt(localStorage.getItem('yearly-max-slots') || '3');
-    const fiveYearMax = parseInt(localStorage.getItem('five-year-max-slots') || '3');
+        setMaxSlots({
+          daily: dailyMax,
+          weekly: weeklyMax,
+          monthly: monthlyMax,
+          yearly: yearlyMax,
+          fiveYear: fiveYearMax
+        });
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        // Fallback to localStorage only
+        const dailyGoals = JSON.parse(localStorage.getItem('daily-outcomes') || '[]');
+        const weeklyGoals = JSON.parse(localStorage.getItem(`weekly-goals-${weekKey}`) || '[]');
+        const monthlyGoals = JSON.parse(localStorage.getItem('monthly-goals') || '[]');
+        const yearlyGoals = JSON.parse(localStorage.getItem('yearly-goals') || '[]');
+        const fiveYearGoals = JSON.parse(localStorage.getItem('five-year-goals') || '[]');
 
-    setMaxSlots({
-      daily: dailyMax,
-      weekly: weeklyMax,
-      monthly: monthlyMax,
-      yearly: yearlyMax,
-      fiveYear: fiveYearMax
-    });
+        setAllGoals({
+          daily: dailyGoals,
+          weekly: weeklyGoals,
+          monthly: monthlyGoals,
+          yearly: yearlyGoals,
+          fiveYear: fiveYearGoals
+        });
+      }
+    };
+
+    loadData();
   }, [weekKey]);
 
   // Touch handlers for swipe
@@ -201,17 +219,38 @@ export default function PyramidPage() {
     }));
   };
 
-  // Save to localStorage whenever goals change
+  // Save to Supabase/localStorage whenever goals change
   useEffect(() => {
-    // Save daily goals with today's date for history tracking
-    const todayKey = formatDate(todayUTC(), 'yyyy-MM-dd');
-    localStorage.setItem('daily-outcomes', JSON.stringify(allGoals.daily));
-    localStorage.setItem(`daily-outcomes-${todayKey}`, JSON.stringify(allGoals.daily));
-    
-    localStorage.setItem(`weekly-goals-${weekKey}`, JSON.stringify(allGoals.weekly));
-    localStorage.setItem('monthly-goals', JSON.stringify(allGoals.monthly));
-    localStorage.setItem('yearly-goals', JSON.stringify(allGoals.yearly));
-    localStorage.setItem('five-year-goals', JSON.stringify(allGoals.fiveYear));
+    const saveData = async () => {
+      try {
+        const userData = {
+          daily: allGoals.daily,
+          weekly: allGoals.weekly,
+          monthly: allGoals.monthly,
+          yearly: allGoals.yearly,
+          fiveYear: allGoals.fiveYear,
+          inactiveGoals: [] // Will be handled separately
+        };
+        
+        await saveUserData(userData);
+        
+        // Also save daily goals with today's date for history tracking
+        const todayKey = formatDate(todayUTC(), 'yyyy-MM-dd');
+        localStorage.setItem(`daily-outcomes-${todayKey}`, JSON.stringify(allGoals.daily));
+      } catch (error) {
+        console.error('Error saving user data:', error);
+        // Fallback to localStorage only
+        const todayKey = formatDate(todayUTC(), 'yyyy-MM-dd');
+        localStorage.setItem('daily-outcomes', JSON.stringify(allGoals.daily));
+        localStorage.setItem(`daily-outcomes-${todayKey}`, JSON.stringify(allGoals.daily));
+        localStorage.setItem(`weekly-goals-${weekKey}`, JSON.stringify(allGoals.weekly));
+        localStorage.setItem('monthly-goals', JSON.stringify(allGoals.monthly));
+        localStorage.setItem('yearly-goals', JSON.stringify(allGoals.yearly));
+        localStorage.setItem('five-year-goals', JSON.stringify(allGoals.fiveYear));
+      }
+    };
+
+    saveData();
   }, [allGoals, weekKey]);
 
   useEffect(() => {
