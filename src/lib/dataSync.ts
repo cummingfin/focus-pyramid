@@ -20,36 +20,136 @@ interface UserData {
   inactiveGoals: any[];
 }
 
-// Get current user
-const getCurrentUser = async () => {
+// Get current user and their workspace
+const getCurrentUserAndWorkspace = async () => {
   const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  if (!user) return { user: null, workspaceId: null };
+
+  // Get user's workspace
+  const { data: membership } = await supabase
+    .from('memberships')
+    .select('workspace_id')
+    .eq('user_id', user.id)
+    .single();
+
+  return { user, workspaceId: membership?.workspace_id };
 };
 
-// Save goals to Supabase
+// Ensure workspace exists for user
+const ensureWorkspace = async (userId: string) => {
+  try {
+    // Check if user already has a workspace
+    const { data: existingMembership } = await supabase
+      .from('memberships')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (existingMembership) {
+      return existingMembership.workspace_id;
+    }
+
+    // Create new workspace
+    const { data: workspace, error: workspaceError } = await supabase
+      .from('workspaces')
+      .insert({
+        name: 'My Workspace',
+        owner_id: userId
+      })
+      .select()
+      .single();
+
+    if (workspaceError) {
+      console.error('Error creating workspace:', workspaceError);
+      return null;
+    }
+
+    // Create membership
+    const { error: membershipError } = await supabase
+      .from('memberships')
+      .insert({
+        workspace_id: workspace.id,
+        user_id: userId,
+        role: 'owner'
+      });
+
+    if (membershipError) {
+      console.error('Error creating membership:', membershipError);
+      return null;
+    }
+
+    return workspace.id;
+  } catch (error) {
+    console.error('Error ensuring workspace:', error);
+    return null;
+  }
+};
+
+// Get or create default area
+const getDefaultArea = async (workspaceId: string) => {
+  try {
+    // Check if default area exists
+    const { data: existingArea } = await supabase
+      .from('areas')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('is_default', true)
+      .single();
+
+    if (existingArea) {
+      return existingArea.id;
+    }
+
+    // Create default area
+    const { data: area, error } = await supabase
+      .from('areas')
+      .insert({
+        workspace_id: workspaceId,
+        name: 'General',
+        is_default: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating default area:', error);
+      return null;
+    }
+
+    return area.id;
+  } catch (error) {
+    console.error('Error getting default area:', error);
+    return null;
+  }
+};
+
+// Save goals to Supabase using your existing schema
 export const saveGoalsToSupabase = async (horizon: string, goals: Goal[]) => {
   try {
-    const user = await getCurrentUser();
-    if (!user) return;
+    const { user, workspaceId } = await getCurrentUserAndWorkspace();
+    if (!user || !workspaceId) return;
+
+    // Ensure default area exists
+    const areaId = await getDefaultArea(workspaceId);
+    if (!areaId) return;
 
     // Clear existing goals for this horizon
     await supabase
       .from('goals')
       .delete()
-      .eq('user_id', user.id)
+      .eq('workspace_id', workspaceId)
       .eq('horizon', horizon);
 
     // Insert new goals
     if (goals.length > 0) {
-      const goalsToInsert = goals.map(goal => ({
-        user_id: user.id,
+      const goalsToInsert = goals.map((goal, index) => ({
+        workspace_id: workspaceId,
+        area_id: areaId,
         horizon,
-        slot: goal.slot,
         title: goal.title,
-        done: goal.done,
-        area: goal.area,
-        linked_to_parent: goal.linkedToParent,
-        created_at: goal.created_at
+        active: !goal.done, // In your schema, active=true means not completed
+        parent_goal_id: goal.linkedToParent || null,
+        created_at: goal.created_at || new Date().toISOString()
       }));
 
       const { error } = await supabase
@@ -65,31 +165,32 @@ export const saveGoalsToSupabase = async (horizon: string, goals: Goal[]) => {
   }
 };
 
-// Load goals from Supabase
+// Load goals from Supabase using your existing schema
 export const loadGoalsFromSupabase = async (horizon: string): Promise<Goal[]> => {
   try {
-    const user = await getCurrentUser();
-    if (!user) return [];
+    const { user, workspaceId } = await getCurrentUserAndWorkspace();
+    if (!user || !workspaceId) return [];
 
     const { data, error } = await supabase
       .from('goals')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('workspace_id', workspaceId)
       .eq('horizon', horizon)
-      .order('slot');
+      .eq('active', true)
+      .order('created_at');
 
     if (error) {
       console.error(`Error loading ${horizon} goals:`, error);
       return [];
     }
 
-    return data.map(goal => ({
+    return data.map((goal, index) => ({
       id: goal.id,
-      slot: goal.slot,
+      slot: index + 1, // Convert to slot-based system
       title: goal.title,
-      done: goal.done,
-      area: goal.area,
-      linkedToParent: goal.linked_to_parent,
+      done: !goal.active, // In your schema, active=false means completed
+      area: null, // We'll use the area_id from the goal
+      linkedToParent: goal.parent_goal_id,
       created_at: goal.created_at
     }));
   } catch (error) {
@@ -101,8 +202,8 @@ export const loadGoalsFromSupabase = async (horizon: string): Promise<Goal[]> =>
 // Sync all user data
 export const syncUserData = async (): Promise<UserData> => {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const { user, workspaceId } = await getCurrentUserAndWorkspace();
+    if (!user || !workspaceId) {
       // Return localStorage data if no user
       return {
         daily: JSON.parse(localStorage.getItem('daily-outcomes') || '[]'),
@@ -152,38 +253,41 @@ export const syncUserData = async (): Promise<UserData> => {
   }
 };
 
-// Save all user data
-export const saveUserData = async (data: UserData) => {
+export const saveUserData = async (goals: UserData) => {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      // Save to localStorage if no user
-      localStorage.setItem('daily-outcomes', JSON.stringify(data.daily));
-      localStorage.setItem(`weekly-goals-${formatDate(getWeekStart(), 'yyyy-MM-dd')}`, JSON.stringify(data.weekly));
-      localStorage.setItem('monthly-goals', JSON.stringify(data.monthly));
-      localStorage.setItem('yearly-goals', JSON.stringify(data.yearly));
-      localStorage.setItem('five-year-goals', JSON.stringify(data.fiveYear));
-      localStorage.setItem('inactive-goals', JSON.stringify(data.inactiveGoals));
+    const { user, workspaceId } = await getCurrentUserAndWorkspace();
+    if (!user || !workspaceId) {
+      // Fallback to localStorage only
+      localStorage.setItem('daily-outcomes', JSON.stringify(goals.daily));
+      localStorage.setItem(`weekly-goals-${formatDate(getWeekStart(), 'yyyy-MM-dd')}`, JSON.stringify(goals.weekly));
+      localStorage.setItem('monthly-goals', JSON.stringify(goals.monthly));
+      localStorage.setItem('yearly-goals', JSON.stringify(goals.yearly));
+      localStorage.setItem('five-year-goals', JSON.stringify(goals.fiveYear));
       return;
     }
 
     // Save to Supabase
     await Promise.all([
-      saveGoalsToSupabase('daily', data.daily),
-      saveGoalsToSupabase('weekly', data.weekly),
-      saveGoalsToSupabase('monthly', data.monthly),
-      saveGoalsToSupabase('yearly', data.yearly),
-      saveGoalsToSupabase('five-year', data.fiveYear)
+      saveGoalsToSupabase('daily', goals.daily),
+      saveGoalsToSupabase('weekly', goals.weekly),
+      saveGoalsToSupabase('monthly', goals.monthly),
+      saveGoalsToSupabase('yearly', goals.yearly),
+      saveGoalsToSupabase('five-year', goals.fiveYear)
     ]);
 
     // Also save to localStorage for offline capability
-    localStorage.setItem('daily-outcomes', JSON.stringify(data.daily));
-    localStorage.setItem(`weekly-goals-${formatDate(getWeekStart(), 'yyyy-MM-dd')}`, JSON.stringify(data.weekly));
-    localStorage.setItem('monthly-goals', JSON.stringify(data.monthly));
-    localStorage.setItem('yearly-goals', JSON.stringify(data.yearly));
-    localStorage.setItem('five-year-goals', JSON.stringify(data.fiveYear));
-    localStorage.setItem('inactive-goals', JSON.stringify(data.inactiveGoals));
+    localStorage.setItem('daily-outcomes', JSON.stringify(goals.daily));
+    localStorage.setItem(`weekly-goals-${formatDate(getWeekStart(), 'yyyy-MM-dd')}`, JSON.stringify(goals.weekly));
+    localStorage.setItem('monthly-goals', JSON.stringify(goals.monthly));
+    localStorage.setItem('yearly-goals', JSON.stringify(goals.yearly));
+    localStorage.setItem('five-year-goals', JSON.stringify(goals.fiveYear));
   } catch (error) {
     console.error('Error saving user data:', error);
+    // Fallback to localStorage
+    localStorage.setItem('daily-outcomes', JSON.stringify(goals.daily));
+    localStorage.setItem(`weekly-goals-${formatDate(getWeekStart(), 'yyyy-MM-dd')}`, JSON.stringify(goals.weekly));
+    localStorage.setItem('monthly-goals', JSON.stringify(goals.monthly));
+    localStorage.setItem('yearly-goals', JSON.stringify(goals.yearly));
+    localStorage.setItem('five-year-goals', JSON.stringify(goals.fiveYear));
   }
 };
