@@ -238,8 +238,11 @@ export const loadGoalsFromSupabase = async (horizon: string): Promise<Goal[]> =>
 export const syncUserData = async (): Promise<UserData> => {
   try {
     const { user, workspaceId } = await getCurrentUserAndWorkspace();
+    console.log('Sync user data - User:', user?.email, 'WorkspaceId:', workspaceId);
+    
     if (!user || !workspaceId) {
-      // Return localStorage data if no user
+      console.log('No user or workspace, using localStorage only');
+      // Return localStorage data if no user or workspace
       return {
         daily: JSON.parse(localStorage.getItem('daily-outcomes') || '[]'),
         weekly: JSON.parse(localStorage.getItem(`weekly-goals-${formatDate(getWeekStart(), 'yyyy-MM-dd')}`) || '[]'),
