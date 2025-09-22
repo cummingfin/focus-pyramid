@@ -29,6 +29,14 @@ export default function AppLayout({
         
         // For now, just set a dummy workspace ID to make the app work
         setCurrentWorkspace('demo-workspace');
+        
+        // Redirect to pyramid page if user lands on any other app route
+        const currentPath = window.location.pathname;
+        if (currentPath === '/' || currentPath === '/today') {
+          router.push('/pyramid');
+          return;
+        }
+        
         setIsLoading(false);
         setLoading(false);
       } catch (error) {
@@ -47,6 +55,12 @@ export default function AppLayout({
         if (event === 'SIGNED_IN' && session) {
           console.log('User signed in, setting demo workspace');
           setCurrentWorkspace('demo-workspace');
+          
+          // Redirect to pyramid page after successful sign in
+          const currentPath = window.location.pathname;
+          if (currentPath === '/' || currentPath === '/today') {
+            router.push('/pyramid');
+          }
         } else if (event === 'SIGNED_OUT' || !session) {
           console.log('User signed out, redirecting to login');
           setCurrentWorkspace(null);
