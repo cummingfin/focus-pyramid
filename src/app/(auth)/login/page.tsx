@@ -65,10 +65,15 @@ export default function LoginPage() {
     setMessage('');
     
     try {
+      // Use production URL for OAuth redirect to ensure it works in production
+      const redirectUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://focus-pyramid-n5d5.vercel.app/auth/callback'
+        : `${window.location.origin}/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
         },
       });
 

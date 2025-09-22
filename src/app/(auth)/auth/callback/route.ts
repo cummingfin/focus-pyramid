@@ -29,5 +29,9 @@ export async function GET(request: NextRequest) {
   }
 
   // URL to redirect to after sign in process completes
-  return NextResponse.redirect(requestUrl.origin + '/pyramid');
+  const redirectUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://focus-pyramid-n5d5.vercel.app/pyramid'
+    : requestUrl.origin + '/pyramid';
+  
+  return NextResponse.redirect(redirectUrl);
 }
