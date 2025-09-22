@@ -8,7 +8,7 @@ const mapHorizonToDB = (horizon: string): string => {
     'weekly': 'weekly', 
     'monthly': 'monthly',
     'yearly': 'yearly',
-    'five-year': 'five_year'  // Database likely uses snake_case
+    'five-year': 'five_year'  // Database uses snake_case
   };
   return mapping[horizon] || horizon;
 };
@@ -74,12 +74,12 @@ const ensureWorkspace = async (userId: string) => {
   try {
     console.log('Ensuring workspace for user:', userId);
     
-        // Check if user already has a workspace (ignore errors due to RLS)
-        const { data: existingMembership, error: membershipCheckError } = await supabase
-          .from('memberships')
-          .select('workspace_id')
-          .eq('user_id', userId)
-          .maybeSingle();
+    // Check if user already has a workspace
+    const { data: existingMembership, error: membershipCheckError } = await supabase
+      .from('memberships')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .maybeSingle();
 
     console.log('Existing membership check:', existingMembership, 'Error:', membershipCheckError);
 
@@ -88,49 +88,19 @@ const ensureWorkspace = async (userId: string) => {
       return existingMembership.workspace_id;
     }
 
-    // If there's an error (like RLS blocking), we'll still try to create a workspace
-    if (membershipCheckError) {
-      console.log('Membership check failed (likely RLS), proceeding to create workspace...');
-    }
-
-    console.log('Creating new workspace...');
+    console.log('Creating new workspace using helper function...');
     
-    // Create new workspace
-    const { data: workspace, error: workspaceError } = await supabase
-      .from('workspaces')
-      .insert({
-        name: 'My Workspace',
-        owner_id: userId
-      })
-      .select()
-      .single();
+    // Use the database helper function to create workspace, membership, and default area
+    const { data: workspaceId, error: workspaceError } = await supabase
+      .rpc('create_user_workspace', { user_id: userId });
 
     if (workspaceError) {
       console.error('Error creating workspace:', workspaceError);
-      // If workspace creation fails due to RLS, return null and fall back to localStorage
       return null;
     }
 
-    console.log('Workspace created:', workspace.id);
-
-    // Create membership
-    const { error: membershipError } = await supabase
-      .from('memberships')
-      .insert({
-        workspace_id: workspace.id,
-        user_id: userId,
-        role: 'owner'
-      });
-
-    if (membershipError) {
-      console.error('Error creating membership:', membershipError);
-      // If membership creation fails, we still have the workspace, so return it
-      console.log('Membership creation failed, but workspace exists:', workspace.id);
-      return workspace.id;
-    }
-
-    console.log('Membership created successfully');
-    return workspace.id;
+    console.log('Workspace created successfully:', workspaceId);
+    return workspaceId;
   } catch (error) {
     console.error('Error ensuring workspace:', error);
     return null;
