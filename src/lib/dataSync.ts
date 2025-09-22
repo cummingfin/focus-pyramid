@@ -1,6 +1,29 @@
 import { supabase } from './supabase';
 import { formatDate, getWeekStart } from './dates';
 
+// Map frontend horizon values to database enum values
+const mapHorizonToDB = (horizon: string): string => {
+  const mapping: Record<string, string> = {
+    'daily': 'daily',
+    'weekly': 'weekly', 
+    'monthly': 'monthly',
+    'yearly': 'yearly',
+    'five-year': 'five_year'  // Database likely uses snake_case
+  };
+  return mapping[horizon] || horizon;
+};
+
+const mapHorizonFromDB = (horizon: string): string => {
+  const mapping: Record<string, string> = {
+    'daily': 'daily',
+    'weekly': 'weekly',
+    'monthly': 'monthly', 
+    'yearly': 'yearly',
+    'five_year': 'five-year'  // Convert back to frontend format
+  };
+  return mapping[horizon] || horizon;
+};
+
 interface Goal {
   id: string;
   slot: number;
@@ -27,12 +50,12 @@ const getCurrentUserAndWorkspace = async () => {
   
   if (!user) return { user: null, workspaceId: null };
 
-  // Get user's workspace
+  // Get user's workspace - use .maybeSingle() to handle multiple rows gracefully
   const { data: membership, error } = await supabase
     .from('memberships')
     .select('workspace_id')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   console.log('Membership query result:', membership, 'Error:', error);
   
@@ -51,12 +74,12 @@ const ensureWorkspace = async (userId: string) => {
   try {
     console.log('Ensuring workspace for user:', userId);
     
-    // Check if user already has a workspace (ignore errors due to RLS)
-    const { data: existingMembership, error: membershipCheckError } = await supabase
-      .from('memberships')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .single();
+        // Check if user already has a workspace (ignore errors due to RLS)
+        const { data: existingMembership, error: membershipCheckError } = await supabase
+          .from('memberships')
+          .select('workspace_id')
+          .eq('user_id', userId)
+          .maybeSingle();
 
     console.log('Existing membership check:', existingMembership, 'Error:', membershipCheckError);
 
@@ -168,19 +191,23 @@ export const saveGoalsToSupabase = async (horizon: string, goals: Goal[]) => {
     console.log('Area ID:', areaId);
     if (!areaId) return;
 
+    // Map horizon to database format
+    const dbHorizon = mapHorizonToDB(horizon);
+    console.log(`Mapping horizon "${horizon}" to "${dbHorizon}"`);
+
     // Clear existing goals for this horizon
     await supabase
       .from('goals')
       .delete()
       .eq('workspace_id', workspaceId)
-      .eq('horizon', horizon);
+      .eq('horizon', dbHorizon);
 
     // Insert new goals
     if (goals.length > 0) {
       const goalsToInsert = goals.map((goal, index) => ({
         workspace_id: workspaceId,
         area_id: areaId,
-        horizon,
+        horizon: dbHorizon,
         title: goal.title,
         active: !goal.done, // In your schema, active=true means not completed
         parent_goal_id: goal.linkedToParent || null,
@@ -206,11 +233,15 @@ export const loadGoalsFromSupabase = async (horizon: string): Promise<Goal[]> =>
     const { user, workspaceId } = await getCurrentUserAndWorkspace();
     if (!user || !workspaceId) return [];
 
+    // Map horizon to database format
+    const dbHorizon = mapHorizonToDB(horizon);
+    console.log(`Loading goals for horizon "${horizon}" -> "${dbHorizon}"`);
+
     const { data, error } = await supabase
       .from('goals')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .eq('horizon', horizon)
+      .eq('horizon', dbHorizon)
       .eq('active', true)
       .order('created_at');
 
@@ -327,5 +358,67 @@ export const saveUserData = async (goals: UserData) => {
     localStorage.setItem('monthly-goals', JSON.stringify(goals.monthly));
     localStorage.setItem('yearly-goals', JSON.stringify(goals.yearly));
     localStorage.setItem('five-year-goals', JSON.stringify(goals.fiveYear));
+  }
+};
+
+// Clean up duplicate workspaces (run this once to fix the current mess)
+export const cleanupDuplicateWorkspaces = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    console.log('Cleaning up duplicate workspaces for user:', user.email);
+
+    // Get all memberships for this user
+    const { data: memberships, error } = await supabase
+      .from('memberships')
+      .select('workspace_id, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching memberships:', error);
+      return;
+    }
+
+    if (memberships && memberships.length > 1) {
+      console.log(`Found ${memberships.length} workspaces, keeping the first one`);
+      
+      // Keep the first workspace, delete the rest
+      const workspacesToDelete = memberships.slice(1);
+      
+      for (const membership of workspacesToDelete) {
+        console.log('Deleting workspace:', membership.workspace_id);
+        
+        // Delete goals in this workspace
+        await supabase
+          .from('goals')
+          .delete()
+          .eq('workspace_id', membership.workspace_id);
+        
+        // Delete areas in this workspace
+        await supabase
+          .from('areas')
+          .delete()
+          .eq('workspace_id', membership.workspace_id);
+        
+        // Delete membership
+        await supabase
+          .from('memberships')
+          .delete()
+          .eq('workspace_id', membership.workspace_id)
+          .eq('user_id', user.id);
+        
+        // Delete workspace
+        await supabase
+          .from('workspaces')
+          .delete()
+          .eq('id', membership.workspace_id);
+      }
+      
+      console.log('Cleanup complete!');
+    }
+  } catch (error) {
+    console.error('Error cleaning up workspaces:', error);
   }
 };
